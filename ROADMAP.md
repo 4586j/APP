@@ -57,17 +57,17 @@
 > **目标**：环境就绪、Maven 多模块编译通过、中间件运行
 
 #### B0.1 开发环境
-- [⬜] JDK 17 安装确认（server3 上需 `java -version`）
+- [x] JDK 17 安装确认（OpenJDK 17 GA, 华为云源，/opt/jdk/current） ✅ 2026-06-24
 - [⬜] Node.js 20 LTS + pnpm 安装
 - [⬜] Docker（server3 上未装，需走 CentOS 7 兼容方案）
 - [⬜] 中间件 docker-compose.yml（MySQL 8 + Redis 7 + MinIO）
 
 #### B0.2 父 POM 重构
-- [⬜] Spring Boot **4.1.0 RC → 3.3.5 LTS**
-- [⬜] `<groupId>` `com.example` → `com.erp`
-- [⬜] `<artifactId>` `demo2` → `erp-parent`
-- [⬜] `<packaging>pom`
-- [⬜] 添加 `<dependencyManagement>` 统一管理：
+- [x] Spring Boot **4.1.0 RC → 3.3.5 LTS** ✅
+- [x] `<groupId>` `com.example` → `com.erp` ✅
+- [x] `<artifactId>` `demo2` → `erp-parent` ✅
+- [⬜] `<packaging>pom` ⏸ 推迟到 B0.3（当前单模块过渡期 packaging=jar，可跑 spring-boot:run）
+- [x] 添加 `<dependencyManagement>` 统一管理（10 项关键版本锁定，B0.3 子模块按需引入）：
   spring-boot-starter-web、mybatis-plus-spring-boot3-starter、mysql-connector-j、
   flyway-core/mysql、spring-boot-starter-data-redis、spring-boot-starter-security、
   easyexcel、knife4j、hutool-all、minio、poi、lombok

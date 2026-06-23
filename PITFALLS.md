@@ -255,3 +255,60 @@
 | 日期 | 变更 |
 |------|------|
 | 2026-06-24 | 文档骨架建立 + 已识别的 5 个开局陷阱 + CentOS 7 沿用经验 + 通用约束 |
+ 
+### 6. JDK 17 国内源大多 404，仅华为云 OpenJDK GA 可用（CentOS 7）
+
+**症状**：
+- npmmirror Adoptium 镜像：`[NOT_FOUND] Binary "adoptium" not found`
+- 清华 TUNA：SPA 化主页，老旧路径 `/Adoptium/17/jdk/x64/linux/...` 全 404
+- 中科大 USTC：403 Forbidden
+- 腾讯云/BFSU：404
+- GitHub Adoptium releases：能连通但下载 3 KB/s（实测 3 分钟 1.3MB / 182MB）
+
+**唯一稳定的国内源**：
+```bash
+# OpenJDK 17 GA (Oracle 官方编译)，速度 10 MB/s
+curl -fL -o jdk17.tar.gz   https://mirrors.huaweicloud.com/openjdk/17/openjdk-17_linux-x64_bin.tar.gz
+```
+注意：华为云只有 17 GA（无 17.0.1/17.0.2 之后的子版本），但 Spring Boot 3.3.5 + Spring Framework 6 完全兼容 17 GA。如果未来需要 Temurin/特定子版本，备选：先从能联通的 GitHub 慢速下载到 server0（境外更快），再 base64 推送到 server3。
+
+### 7. Maven Wrapper（mvnw）首次启动会卡住
+
+**症状**：项目自带的 `.mvn/wrapper/maven-wrapper.properties` 指向 `repo.maven.apache.org`，CentOS 7 直连境外 Maven 中心仓库速度极慢，`./mvnw` 首次运行会卡在下载 Maven 二进制 8MB 这一步。
+
+**解决**：直接装本地 Maven 跳过 wrapper：
+```bash
+curl -fL -o /tmp/maven.tar.gz   https://mirrors.huaweicloud.com/apache/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz
+tar xzf /tmp/maven.tar.gz -C /opt && mv /opt/apache-maven-3.9.9 /opt/maven
+cat > /etc/profile.d/maven.sh << 'EOF'
+export M2_HOME=/opt/maven
+export PATH=$M2_HOME/bin:$PATH
+EOF
+```
+配套 `~/.m2/settings.xml` 用阿里云镜像：
+```xml
+<mirror>
+  <id>aliyunmaven</id>
+  <mirrorOf>central</mirrorOf>
+  <url>https://maven.aliyun.com/repository/public</url>
+</mirror>
+```
+
+### 8. Git root-commit stage 残留：旧文件会被一起入库
+
+**症状**：仓库从未提交过，先用 `git add` stage 了一批文件，后续又改文件、移动目录、做新 stage，**之前的 stage 仍然有效**。`git commit` 时会把所有累积的 stage 一起 commit，包括已经在工作区不存在的旧文件。
+
+本次踩坑：B0.2 把 `src/main/java/com/example/demo/Demo2Application.java` 移走改成 `com.erp`，但首次 commit 的 `git status` 显示这个文件是 `AD`（add+delete），意思是「之前 stage 过 add，现在又 stage 过 delete」。`git commit` 仍然把它 `create mode`，因为 `AD` 不会自动跳过 add 部分——你需要再次 `git rm` 一遍才能真正从 commit 树里清除。
+
+**验证方法**：
+```bash
+git ls-tree -r HEAD | grep -i 旧路径关键字   # 必须空
+```
+**修复**：
+```bash
+git rm -rf src/main/java/com/example src/test/java/com/example
+git commit -m "cleanup: 移除入库的旧包"
+```
+
+**预防**：root-commit 之前先 `git status` 完整审查一遍，所有 `AD`/`AM` 行都要确认是想要的状态；移动目录后做一次 `git add -A`，让 git 同步检测删除。
+ 
