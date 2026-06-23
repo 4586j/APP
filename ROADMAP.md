@@ -66,20 +66,27 @@
 - [x] Spring Boot **4.1.0 RC → 3.3.5 LTS** ✅
 - [x] `<groupId>` `com.example` → `com.erp` ✅
 - [x] `<artifactId>` `demo2` → `erp-parent` ✅
-- [⬜] `<packaging>pom` ⏸ 推迟到 B0.3（当前单模块过渡期 packaging=jar，可跑 spring-boot:run）
+- [x] `<packaging>pom` ✅（B0.3 拆分时改为 pom，父工程聚合 14 子模块）
 - [x] 添加 `<dependencyManagement>` 统一管理（10 项关键版本锁定，B0.3 子模块按需引入）：
   spring-boot-starter-web、mybatis-plus-spring-boot3-starter、mysql-connector-j、
   flyway-core/mysql、spring-boot-starter-data-redis、spring-boot-starter-security、
   easyexcel、knife4j、hutool-all、minio、poi、lombok
 
-#### B0.3 创建 14 个子模块目录
-- [⬜] erp-common / erp-security / erp-user / erp-product / erp-customer
-- [⬜] erp-order / erp-finance / erp-approval / erp-logistics / erp-document
-- [⬜] erp-data / erp-notification / erp-dashboard / erp-web
+#### ✅ B0.3 创建 14 个子模块目录
+- [x] erp-common / erp-security / erp-user / erp-product / erp-customer ✅
+- [x] erp-order / erp-finance / erp-approval / erp-logistics / erp-document ✅
+- [x] erp-data / erp-notification / erp-report / erp-web ✅
+  - 命名修正：erp-dashboard → erp-report（对齐 DEV_GUIDE §3.2）
+- [x] erp-common 骨架：BaseEntity / BaseQuery / R<T> / PageResult / BusinessException / EnableStatus ✅
+- [x] erp-web 骨架：ErpApplication 迁入 + GlobalExceptionHandler + spring-boot-maven-plugin ✅
+- [x] 模块依赖关系：erp-common 无内部依赖；erp-security 依赖 erp-common；
+  业务模块依赖 erp-common+erp-security；erp-web 聚合全部 13 个 ✅
 
 #### B0.4 编译验收
-- [⬜] `./mvnw clean compile` BUILD SUCCESS
-- [⬜] Docker 三件套 ping 通
+- [x] `mvn clean compile` BUILD SUCCESS ✅（14/14 模块，22.5s）
+- [x] `mvn test` BUILD SUCCESS ✅（contextLoads 通过，临时排除 DataSource/Flyway 自动配置）
+- [x] `mvn package` 产出 erp-web/target/erp-web.jar 58MB ✅
+- [⬜] Docker 三件套（MySQL/Redis/MinIO）ping 通 ⏸ 待 B1.1 阶段一起装
 
 ---
 

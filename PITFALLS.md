@@ -311,4 +311,71 @@ git commit -m "cleanup: 移除入库的旧包"
 ```
 
 **预防**：root-commit 之前先 `git status` 完整审查一遍，所有 `AD`/`AM` 行都要确认是想要的状态；移动目录后做一次 `git add -A`，让 git 同步检测删除。
- 
+---
+
+## §9 子 pom <description> 中包含 `<T>` 会让 XML 解析失败【B0.3】
+
+**症状**：执行 `mvn clean compile` 在第一个子模块就报 `Non-parseable POM`：
+```
+TEXT must be immediately followed by END_TAG and not START_TAG
+(position: START_TAG seen ...<description>基础共用层：BaseEntity / R<T>...)
+```
+
+**根因**：XML 字面 `<T>` 被当作未闭合的元素标签。Java 泛型语法在 XML 文本节点里属于非法字符。
+
+**解决**：所有出现在 XML 文本节点中的 `<` `>` 必须实体化：
+```xml
+<description>R&lt;T&gt; / PageResult&lt;T&gt;</description>
+```
+
+或者干脆不在 description 里写泛型签名。
+
+**预防**：B0.3 阶段批量生成子 pom 时，对 description 字段做转义，或者干脆只写中文描述不带类型签名。
+
+---
+
+## §10 erp-common 不应依赖 Spring Web（架构分层陷阱）【B0.3】
+
+**症状**：把 `GlobalExceptionHandler` 放到 erp-common 时报：
+```
+package org.springframework.http does not exist
+cannot find symbol: class RestControllerAdvice
+cannot find symbol: class ResponseEntity
+```
+
+**根因**：架构边界违反。erp-common 是最底层依赖，被所有 13 个模块引用；它不应该引入任何 Web/Servlet 依赖，否则会污染所有业务模块（连 erp-security 都得拉 spring-web）。
+
+**正解**：分层放置：
+- `erp-common.exception.BusinessException` ← 纯业务异常类型，框架无关
+- `erp-web.exception.GlobalExceptionHandler` ← Web 层异常翻译，依赖 `spring-boot-starter-web`
+
+业务模块抛 `BusinessException`，由 web 层 `@RestControllerAdvice` 统一翻译成 `R.fail(code, msg)`。
+
+**经验**：base 层只能依赖 starter（不带 -web），任何 `@RestController*` `ResponseEntity` `HttpStatus` 都属于 web 层。
+
+---
+
+## §11 父 pom 引了 spring-boot-starter-parent 时，子模块 contextLoads 测试默认期望 DataSource【B0.3】
+
+**症状**：B0.3 加了 mybatis-plus + flyway + mysql-connector 的 dependencyManagement 后，erp-web 的 contextLoads 测试报：
+```
+Failed to determine a suitable driver class
+DataSourceBeanCreationException
+```
+
+**根因**：B0.3 阶段还没装 MySQL（B1.1 才装），但 spring-boot-autoconfigure 一旦在 classpath 看到 HikariCP + mybatis-plus，就会尝试初始化 DataSource。
+
+**临时解决**（B0.3 阶段）：测试类排除自动配置：
+```java
+@SpringBootTest
+@EnableAutoConfiguration(exclude = {
+    DataSourceAutoConfiguration.class,
+    FlywayAutoConfiguration.class,
+    HibernateJpaAutoConfiguration.class
+})
+class ErpApplicationTests {}
+```
+
+**B1.1 阶段**：装好 MySQL/Redis 后改回标准 `@SpringBootTest`，让 Flyway 真正运行迁移。
+
+**经验**：跨阶段的临时绕过要在代码注释 + PITFALLS 留痕，避免 B1.1 时忘记还原。
