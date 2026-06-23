@@ -1,0 +1,266 @@
+# 外贸 ERP 系统 — 开发路线图 / 进度看板
+
+> **项目位置**：`server3:/code/demo2`
+> **文档来源**：基于 `guide/DEV_STEPS.md` 8 阶段路线图 + 当前代码现状盘点
+> **创建日期**：2026-06-24
+> **最后更新**：2026-06-24
+
+---
+
+## 📋 使用说明
+
+- ✅ = 已完成
+- 🟡 = 进行中
+- ⬜ = 待办
+- ⚠️ = 阻塞/有依赖
+
+完成步骤后将对应方框从 `⬜` 改为 `✅`，整个任务完成后将任务标题前的 `⬜` 改为 `✅`。
+
+---
+
+## 🎯 PART A：已存在的资产（盘点）
+
+### ✅ A1. 项目骨架与脚手架（部分）
+- [✅] Maven 项目结构（`pom.xml` + `mvnw` + `mvnw.cmd`）
+- [✅] Spring Boot 启动类 `Demo2Application.java`（空壳）
+- [⚠️] **pom 父版本为 Spring Boot 4.1.0 RC，需降到 3.3.5 稳定版**（DEV_GUIDE 明确要求）
+- [✅] `.gitignore`（含 IDEA / Maven / Spring）
+- [⚠️] `.gitignore` 把 `guide/` 整目录忽略 — 团队文档无法进版本控制（PITFALLS §3）
+
+### ✅ A2. 前端 UI 页面壳（30 个 .vue 文件）
+- [✅] Vue 3 + Vite 5 + TypeScript + Element Plus + Pinia + ECharts 已配置
+- [✅] 布局组件：`Layout.vue` / `Navbar.vue` / `Sidebar.vue`
+- [✅] 路由：`router/index.ts`
+- [✅] 用户 store：`store/user.ts`
+- [✅] 10 大业务模块页面壳（共 17 个 view）
+  - login / dashboard / system(用户+角色) / product / customer(客户+供应商)
+  - order(销售列表/创建+采购列表) / finance(总览+资金审批+汇率)
+  - logistics / document / data(上传+定价分析) / approval / error/404
+
+### ✅ A3. 完整数据库设计
+- [✅] `guide/erp_schema.sql` 含 36 张表 DDL（sys_/prd_/crm_/ord_/fin_/log_/doc_/dat_/app_/ntf_ 共 10 前缀）
+- [✅] 含索引、外键、注释、字符集 utf8mb4
+
+### ✅ A4. 完整设计文档
+- [✅] `DEV_GUIDE.md` 开发指南（13 章，~52KB）
+- [✅] `DEV_STEPS.md` 8 阶段开发步骤（~37KB）
+- [✅] `API_DESIGN.md` 26 模块 REST API 规范（~42KB）
+
+---
+
+## 🚀 PART B：开发任务（按 DEV_STEPS 拆解，~ 32 周）
+
+---
+
+### ⬜ B0. 第 0 步 — 项目初始化与环境搭建（2-3 天，P0 阻塞）
+
+> **目标**：环境就绪、Maven 多模块编译通过、中间件运行
+
+#### B0.1 开发环境
+- [⬜] JDK 17 安装确认（server3 上需 `java -version`）
+- [⬜] Node.js 20 LTS + pnpm 安装
+- [⬜] Docker（server3 上未装，需走 CentOS 7 兼容方案）
+- [⬜] 中间件 docker-compose.yml（MySQL 8 + Redis 7 + MinIO）
+
+#### B0.2 父 POM 重构
+- [⬜] Spring Boot **4.1.0 RC → 3.3.5 LTS**
+- [⬜] `<groupId>` `com.example` → `com.erp`
+- [⬜] `<artifactId>` `demo2` → `erp-parent`
+- [⬜] `<packaging>pom`
+- [⬜] 添加 `<dependencyManagement>` 统一管理：
+  spring-boot-starter-web、mybatis-plus-spring-boot3-starter、mysql-connector-j、
+  flyway-core/mysql、spring-boot-starter-data-redis、spring-boot-starter-security、
+  easyexcel、knife4j、hutool-all、minio、poi、lombok
+
+#### B0.3 创建 14 个子模块目录
+- [⬜] erp-common / erp-security / erp-user / erp-product / erp-customer
+- [⬜] erp-order / erp-finance / erp-approval / erp-logistics / erp-document
+- [⬜] erp-data / erp-notification / erp-dashboard / erp-web
+
+#### B0.4 编译验收
+- [⬜] `./mvnw clean compile` BUILD SUCCESS
+- [⬜] Docker 三件套 ping 通
+
+---
+
+### ⬜ B1. Phase 1 — 基础设施（第 1-4 周）
+
+> **目标**：用户能登录系统、看到侧边栏菜单
+> **里程碑**：登录 → 拿 JWT → 调 `/auth/me` → 进入仪表盘
+
+#### B1.1 erp-common（第 1 周）
+- [⬜] `BaseEntity`（id/version 乐观锁/created_at/updated_at/created_by/updated_by/deleted 软删除）
+- [⬜] `BaseItemEntity`（明细行基类）
+- [⬜] `R<T>` 统一响应、`PageResult<T>` 分页
+- [⬜] `BizException`（含 409 OptimisticLockConflict 预设）
+- [⬜] `GlobalExceptionHandler`（400/403/409/500）
+- [⬜] 基础枚举：`OrderStatusEnum` / `CurrencyEnum` / `DepartmentEnum`
+- [⬜] 工具类：`DateUtils` / `StringUtils`
+
+#### B1.2 Flyway + 数据库（第 1 周）
+- [⬜] `V1__init_system_tables.sql`（部门/用户/角色/权限 6 张表，从 `guide/erp_schema.sql` 截取）
+- [⬜] 放在 `erp-web/src/main/resources/db/migration/`
+- [⬜] `application.yml` 启用 Flyway
+- [⬜] 启动验证 6 张系统表自动创建
+
+#### B1.3 前端初始化补齐（第 1 周）
+- [⬜] 包管理切到 pnpm（lock 切换）
+- [⬜] Vite 代理 `/api` → `localhost:8080`
+- [⬜] 缺失目录补齐：`api/` `utils/` `types/`
+- [⬜] `api/request.ts` Axios 实例 + 请求/响应拦截器（自动加 Token、401 跳登录、统一解响应壳）
+- [⬜] SCSS 全局变量 + element-plus 主题色定制
+- [⬜] vue-i18n 配置（en/zh）
+
+#### B1.4 erp-security + 认证（第 2-3 周，按 API_DESIGN §2）
+- [⬜] `JwtTokenProvider` 生成 Access(30min) + Refresh(30day) Token
+- [⬜] `JwtAuthenticationFilter` 每请求拦截
+- [⬜] Redis Token 黑名单（登出加入）
+- [⬜] `@CurrentUser` / `@RequirePermission("xxx:yyy")` 注解
+- [⬜] `POST /auth/login`（含 RSA 公钥加密、防暴破 5次锁15分钟、验证码触发）
+- [⬜] `GET /auth/public-key` / `GET /auth/captcha`
+- [⬜] `POST /auth/refresh` / `POST /auth/refresh-permissions` / `POST /auth/logout`
+- [⬜] `GET /auth/me` / `PUT /auth/password`
+- [⬜] 前端 `login/index.vue` 接 RSA 加密登录流程
+- [⬜] 路由守卫：未登录跳 `/login`、按 `permissions` 过滤菜单
+- [⬜] 前端登出清 Redis Token（调 `/logout` 后清本地）
+
+#### B1.5 erp-user（第 4 周）
+- [⬜] `sys_department` 树形 CRUD（含 `parent_id` + `dept_path`）
+- [⬜] `sys_user` CRUD（含直属上级 superior_id、登录失败锁定）
+- [⬜] `sys_role` CRUD（含 `data_scope` 数据权限粒度 1/2/3/4）
+- [⬜] `sys_permission` CRUD（菜单+按钮+API，含 `http_method`）
+- [⬜] 用户-角色绑定、角色-权限绑定
+- [⬜] 管理员重置密码、用户改密
+- [⬜] 前端 `system/UserManage.vue` / `RoleManage.vue` 联调
+
+---
+
+### ⬜ B2. Phase 2 — 产品与客户（第 5-8 周）
+
+- [⬜] erp-product：产品 CRUD / 分类树 / HS 编码 / 多币种价格
+- [⬜] erp-customer：客户 + 供应商 CRUD（外贸特色字段：SWIFT/Tax ID/付款条款）
+- [⬜] 前端 `product/ProductList.vue` / `customer/CustomerList.vue` / `SupplierList.vue` 联调
+- [⬜] EasyExcel 批量导入/导出
+
+---
+
+### ⬜ B3. Phase 3 — 订单生命周期（第 9-14 周）核心
+
+- [⬜] 销售订单 CRUD + 状态流转（草稿/待审批/已审批/采购中/发货中/已完成/已取消）
+- [⬜] 采购订单 CRUD + 关联销售单
+- [⬜] 订单明细 BaseItemEntity 子表
+- [⬜] 状态变更历史 `ord_status_history`
+- [⬜] 订单利润核算 `ord_profit`
+- [⬜] 前端 `order/SalesOrderList.vue` / `SalesOrderCreate.vue` / `PurchaseOrderList.vue` 联调
+
+---
+
+### ⬜ B4. Phase 4 — 财务与审批（第 15-18 周）
+
+- [⬜] 汇率管理 `fin_exchange_rate`
+- [⬜] 应收/应付/结算/税务
+- [⬜] 资金审批 `fin_fund_approval`（按金额阈值分配审批人）
+- [⬜] 审批引擎（`app_workflow` / `app_workflow_node` / `app_approval_request` / `app_approval_history`）
+- [⬜] 前端 finance/* + approval/ApprovalPending.vue 联调
+
+---
+
+### ⬜ B5. Phase 5 — 物流、单证与通知（第 19-22 周）
+
+- [⬜] 物流跟踪 `log_shipment` / `log_tracking`
+- [⬜] 单证生成（Invoice / Packing List / B/L / C/O）模板化（Apache POI）
+- [⬜] 单证版本管理 `doc_document_version`
+- [⬜] MinIO 单证存储
+- [⬜] 通知中心 `ntf_notification` / `ntf_user_notification`
+- [⬜] 前端 logistics/ShipmentList.vue / document/DocumentList.vue 联调
+
+---
+
+### ⬜ B6. Phase 6 — 数据与报表（第 23-26 周）
+
+- [⬜] 数据上传 `dat_upload`（EasyExcel）
+- [⬜] 定价分析 `dat_pricing_analysis`
+- [⬜] 仪表盘 ECharts 接 `/dashboard` API
+- [⬜] 报表导出（订单/利润/资金）
+- [⬜] 前端 data/DataUpload.vue / PricingAnalysis.vue / dashboard/index.vue 联调
+
+---
+
+### ⬜ B7. Phase 7 — 测试、安全与部署（第 27-30 周）
+
+- [⬜] 单元测试覆盖率 ≥ 60%
+- [⬜] 接口集成测试（Spring Boot Test + Testcontainers）
+- [⬜] 前端 e2e（Playwright）
+- [⬜] 安全：OWASP 扫描、依赖漏洞（snyk/owasp-dependency-check）
+- [⬜] 多实例 + Nginx 负载均衡
+- [⬜] CI/CD（GitLab CI 或 Jenkins）
+- [⬜] 备份策略 + 日志聚合
+
+---
+
+### ⬜ B8. Phase 8 — 培训与交付（第 31-32 周）
+
+- [⬜] 用户手册 / 管理员手册
+- [⬜] 培训视频（5 个部门各一份）
+- [⬜] 数据迁移脚本（如有旧系统）
+- [⬜] 上线 checklist + 试运行
+- [⬜] 售后支持流程
+
+---
+
+## 📊 总体进度看板
+
+| 阶段 | 任务数 | 已完成 | 进行中 | 待办 | 完成率 |
+|------|--------|--------|--------|------|--------|
+| **A 现有资产** | 4 | 4 | 0 | 0 | 100% |
+| **B0 初始化** | 4 | 0 | 0 | 4 | 0% |
+| **B1 基础设施** | 5 | 0 | 0 | 5 | 0% |
+| **B2 产品/客户** | 4 | 0 | 0 | 4 | 0% |
+| **B3 订单（核心）** | 6 | 0 | 0 | 6 | 0% |
+| **B4 财务/审批** | 5 | 0 | 0 | 5 | 0% |
+| **B5 物流/单证** | 6 | 0 | 0 | 6 | 0% |
+| **B6 数据/报表** | 5 | 0 | 0 | 5 | 0% |
+| **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
+| **B8 交付** | 5 | 0 | 0 | 5 | 0% |
+
+**全局进度**：现状盘点完成 100% / 实际开发 0%（待启动 B0 第 0 步）
+
+---
+
+## 🎯 推荐执行顺序
+
+| 优先级 | 任务 | 理由 |
+|--------|------|------|
+| 🥇 P0 | B0 + B1（环境 + 认证 + erp-common + 用户管理） | 阻塞所有后续，是地基 |
+| 🥈 P1 | B2 + B3（产品/客户 + 订单） | 项目核心业务，外贸 ERP 的脊柱 |
+| 🥉 P2 | B4 + B5（财务审批 + 物流单证） | 业务闭环 |
+| 📦 P3 | B6 + B7 + B8（报表 + 测试部署 + 交付） | 收尾与上线 |
+
+---
+
+## ⚠️ 关键风险与依赖
+
+1. **CentOS 7 兼容性**（server3 是 CentOS 7 + glibc 2.17）
+   - Docker 在 CentOS 7 可装但 Docker Compose v2 需新版（同 B2B 项目经验）
+   - JDK 17 需用 zulu 或 openjdk-portable 而非系统包
+   - Node 20 用 nvm + npmmirror 镜像
+   - 详见 `PITFALLS.md`
+
+2. **Spring Boot 版本必须降级**
+   - 当前 `pom.xml` 是 4.1.0 (RC)，DEV_GUIDE 明确要求 3.3.5 LTS
+   - 4.1 改 API 较多，第三方组件（MyBatis-Plus / Knife4j）尚未跟上
+
+3. **guide/ 被 .gitignore 忽略**
+   - 团队协作时设计文档不会随代码提交
+   - 建议：①移出 guide 到独立 docs 仓；②或从 .gitignore 删除 `guide/`
+
+4. **前端缺失 api/ 与 store 业务模块**
+   - 现有 30 个 view 都是纯样式，没接口调用，开始 B1.4 前必须先补齐 `api/request.ts`
+
+---
+
+## 📝 变更日志
+
+| 日期 | 变更 | 负责 |
+|------|------|------|
+| 2026-06-24 | ROADMAP 初版创建：盘点现有资产 + 基于 DEV_STEPS 拆解 9 阶段 51 任务 | 系统 |
