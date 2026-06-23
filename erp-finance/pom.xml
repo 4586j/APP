@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.erp</groupId>
+        <artifactId>erp-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>erp-finance</artifactId>
+    <packaging>jar</packaging>
+    <name>erp-finance</name>
+    <description>财务管理：汇率 / 应收 / 应付 / 结算 / 税务</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.erp</groupId>
+            <artifactId>erp-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.erp</groupId>
+            <artifactId>erp-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>
