@@ -519,3 +519,76 @@ fc-list | head   # 验证：≥ 1 行
 放在 `/code/demo2/.claude/settings.json`（项目级），下次 `claude -p ...` 会自动允许这些命令。**禁用清单**保持空，让 Claude 不能写 git commit/push 之类的不可逆动作（我自己来做）。
 
 **入坑日期**：2026-06-24（B1.4 Phase 2）
+
+---
+
+## 28. `@ConditionalOnBean(DataSource.class)` 时序陷阱 ❌
+
+### 现象
+- `mvn test` 71/71 全绿 ✅
+- fat jar 生产环境启动正常，但登录走的是 `InMemoryUserDetailsLoader`（硬编码 admin/admin123）
+- erp-user 模块 9 个 Bean（ServiceImpl×4 + Controller×4 + MysqlUserDetailsLoader）全部 **静默跳过装配**
+- 应用日志看不到 `MysqlUserDetailsLoader instantiated`
+
+### 根因
+```
+Spring Boot 启动顺序：
+1. @Component 扫描阶段
+   → 评估 @ConditionalOnBean(DataSource.class)
+   → DataSource 还没装配 → 条件 false → erp-user Bean 全部跳过 ❌
+2. AutoConfiguration 阶段
+   → DataSource Bean 才注册（HikariDataSource）
+   → 但此时 erp-user 的扫描已经过去了，没回头检查
+```
+
+`@ConditionalOnBean` 设计上是给 **AutoConfiguration** 用的（auto-config 之间的依赖判定），不是给 `@Component` 用的。`@Component` 扫描发生在 auto-config 之前。
+
+测试环境为什么"假绿"？因为测试用 `@EnableAutoConfiguration(exclude = DataSourceAutoConfiguration.class)`，DataSource 主动被排除 → 条件评估对测试和生产都是 false → InMemory（`@ConditionalOnProperty(havingValue="memory")`）兜底 → 测试通过。生产真有 DataSource，但扫描时机太早评估不到，照样退化。
+
+### 治法
+改用 **`@ConditionalOnProperty`**，在 environment 阶段评估（最早），不依赖 Bean 注册时机：
+
+```java
+// erp-user 所有 Bean
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = "erp.user.persistence",
+    havingValue = "mysql",
+    matchIfMissing = true
+)
+
+// erp-web InMemoryUserDetailsLoader
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = "erp.user.persistence",
+    havingValue = "memory"
+)
+```
+
+```yaml
+# application.yaml（生产默认）
+erp:
+  user:
+    persistence: mysql  # mysql | memory
+```
+
+```java
+// 5 个测试类
+@org.springframework.test.context.TestPropertySource(properties = "erp.user.persistence=memory")
+```
+
+### 验证
+- fat jar 启动日志出现 `MysqlUserDetailsLoader instantiated` ✅
+- 不再出现 `InMemoryUserDetailsLoader 已装载 N 个开发账号` ✅
+- 测试 71/71 仍全绿 ✅
+
+### 备选方案（更重）
+- 独立 starter 模块：把 erp-user 拆成 `erp-user-spring-boot-starter`，用 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 注册 → 自然延迟到 auto-config 阶段，此时 `@ConditionalOnBean(DataSource.class)` 才会正确评估
+- `BeanFactoryPostProcessor`：手动控制 Bean 注册时机
+
+我们选 `@ConditionalOnProperty` —— 一行注解 + 一行配置，最小侵入。
+
+### 一句话教训
+> **`@ConditionalOnBean` 不能用在 `@Component` 上判定 AutoConfiguration 注册的 Bean。**
+> 想做"测试/生产切换"用 `@ConditionalOnProperty`，想做"Bean 间依赖判定"用 AutoConfiguration。
+
+**入坑日期**：2026-06-24（B1.5 后端集成）  
+**修复 commit**：`5d5079b`

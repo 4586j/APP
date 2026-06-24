@@ -156,14 +156,16 @@
 - [✅] 路由守卫：未登录跳 `/login`、刷新懒拉 `/me`（菜单按 permissions 过滤待 B1.5 erp-user 后）
 - [✅] 前端登出清 Redis Token + 清本地
 
-#### B1.5 erp-user（第 4 周）
-- [⬜] `sys_department` 树形 CRUD（含 `parent_id` + `dept_path`）
-- [⬜] `sys_user` CRUD（含直属上级 superior_id、登录失败锁定）
-- [⬜] `sys_role` CRUD（含 `data_scope` 数据权限粒度 1/2/3/4）
-- [⬜] `sys_permission` CRUD（菜单+按钮+API，含 `http_method`）
-- [⬜] 用户-角色绑定、角色-权限绑定
-- [⬜] 管理员重置密码、用户改密
+#### B1.5 erp-user（第 4 周）后端代码 ✅，DB 端到端待 B1.6
+- [✅] `sys_department` 树形 CRUD（含 `parent_id` + `dept_path`）
+- [✅] `sys_user` CRUD（含直属上级 superior_id、登录失败锁定）
+- [✅] `sys_role` CRUD（含 `data_scope` 数据权限粒度 1/2/3/4）
+- [✅] `sys_permission` CRUD（菜单+按钮+API，含 `http_method`）
+- [✅] 用户-角色绑定、角色-权限绑定
+- [✅] 管理员重置密码、用户改密（接口）
 - [⬜] 前端 `system/UserManage.vue` / `RoleManage.vue` 联调
+- [✅] `MysqlUserDetailsLoader` 装配修复（`@ConditionalOnProperty` 替换 `@ConditionalOnBean`）
+- [⬜] DB 列对齐（BaseEntity ↔ schema：`updated_by` 等缺列待 V3 migration）
 
 ---
 
@@ -255,7 +257,7 @@
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
-**全局进度**：现状盘点 100% / 实际开发 ≈ 32%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / B1 前端登录 ✅ / 共 13 commits 72 测试通过 + Flyway + 验证码/refresh/改密 + 前端真链路登录闭环）
+**全局进度**：现状盘点 100% / 实际开发 ≈ 34%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / B1 前端登录 ✅ / **B1.5 erp-user 后端 ✅**（@ConditionalOnProperty 修复装配时序）/ 共 15 commits 71 测试通过 + Flyway V2 button 权限 + MysqlUserDetailsLoader 生产装配）
 
 ---
 
