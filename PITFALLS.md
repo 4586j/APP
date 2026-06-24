@@ -592,3 +592,41 @@ erp:
 
 **入坑日期**：2026-06-24（B1.5 后端集成）  
 **修复 commit**：`5d5079b`
+
+---
+
+## 29. BaseEntity ↔ DB schema 列名漂移
+
+### 现象
+`@ConditionalOnProperty` 修好装配时序后，登录返回 500：
+```
+java.sql.SQLSyntaxErrorException: Unknown column 'updated_by' in 'field list'
+```
+
+### 根因
+- `BaseEntity` 抽象类带 `createdBy / updatedBy / version` 三个审计字段（INSERT_UPDATE 自动填充）
+- V1 init schema 只在 `sys_user` 上加了 `created_by`，其他 sys_* 表（department/role/permission）三个字段全缺
+- B1.5 后端代码本地编译 / 测试都因 `excludeAutoConfiguration=DataSourceAutoConfiguration` 不真连 DB，掩盖了缺列
+- 装配修复后第一次真打 DB，立刻暴露
+
+### 治法
+V3 migration 补列：
+
+```sql
+ALTER TABLE sys_user ADD COLUMN updated_by BIGINT, ADD COLUMN version INT DEFAULT 0;
+ALTER TABLE sys_department ADD COLUMN created_by BIGINT, ADD COLUMN updated_by BIGINT, ADD COLUMN version INT DEFAULT 0;
+ALTER TABLE sys_role ADD COLUMN created_by BIGINT, ADD COLUMN updated_by BIGINT, ADD COLUMN version INT DEFAULT 0;
+ALTER TABLE sys_permission ADD COLUMN created_by BIGINT, ADD COLUMN updated_by BIGINT, ADD COLUMN version INT DEFAULT 0;
+```
+
+### 验证
+- Flyway 自动 v2 → v3 升级 ✅
+- `flyway_schema_history` 多一行 v3 success=1 ✅
+- 登录返回 200 + JWT + `/me` 返回 24 条 DB 权限（含 B1.5 V2 button 权限）✅
+
+### 一句话教训
+> **凡是继承 BaseEntity 的表，schema 必须包含 BaseEntity 的全部字段。**
+> 后续可在 CI 加 schema 校验脚本，对每张表跑 `DESC` 对照 BaseEntity 字段列表。
+
+**入坑日期**：2026-06-24（B1.5 收尾）  
+**修复 commit**：V3 migration + 后续 commit
