@@ -7,4 +7,5 @@ public interface OrdSalesOrderService {
     void update(Long id, SalesOrderUpdateRequest req);
     SalesOrderVO changeStatus(Long id, StatusChangeRequest req, Long userId);
     void delete(Long id);
+    OrderProfitVO calculateProfit(Long id);
 }

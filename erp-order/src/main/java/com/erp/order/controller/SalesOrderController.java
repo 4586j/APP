@@ -14,5 +14,6 @@ public class SalesOrderController {
     @PostMapping @PreAuthorize("hasAuthority('order:create')") public R<SalesOrderVO> create(@Valid @RequestBody SalesOrderCreateRequest r) { return R.ok(salesOrderService.create(r, 1L)); }
     @PutMapping("/{id}") @PreAuthorize("hasAuthority('order:update')") public R<Void> update(@PathVariable Long id, @RequestBody SalesOrderUpdateRequest r) { salesOrderService.update(id,r); return R.ok(); }
     @PutMapping("/{id}/status") @PreAuthorize("hasAuthority('order:update')") public R<SalesOrderVO> changeStatus(@PathVariable Long id, @Valid @RequestBody StatusChangeRequest r) { return R.ok(salesOrderService.changeStatus(id, r, 1L)); }
+    @GetMapping("/{id}/profit") public R<OrderProfitVO> profit(@PathVariable Long id) { return R.ok(salesOrderService.calculateProfit(id)); }
     @DeleteMapping("/{id}") @PreAuthorize("hasAuthority('order:delete')") public R<Void> delete(@PathVariable Long id) { salesOrderService.delete(id); return R.ok(); }
 }

@@ -153,4 +153,37 @@ public class OrdSalesOrderServiceImpl implements OrdSalesOrderService {
         orderMapper.deleteById(id);
         itemMapper.delete(new LambdaQueryWrapper<OrdSalesOrderItem>().eq(OrdSalesOrderItem::getOrderId, id));
     }
+
+    @Override
+    public OrderProfitVO calculateProfit(Long orderId) {
+        var o = orderMapper.selectById(orderId);
+        if (o == null) throw new BusinessException(R.CODE_NOT_FOUND, "order not found");
+        var items = itemMapper.selectList(new LambdaQueryWrapper<OrdSalesOrderItem>()
+                .eq(OrdSalesOrderItem::getOrderId, orderId));
+        var salesTotal = items.stream().map(OrdSalesOrderItem::getTotalPrice).reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        var exchg = o.getExchangeRate() != null ? o.getExchangeRate() : java.math.BigDecimal.ONE;
+        var salesCny = salesTotal.multiply(exchg);
+        var purchaseTotal = salesTotal.multiply(new java.math.BigDecimal("0.6"));
+        var profit = salesCny.subtract(purchaseTotal);
+        var margin = salesCny.compareTo(java.math.BigDecimal.ZERO) > 0
+                ? profit.multiply(new java.math.BigDecimal("100")).divide(salesCny, 2, java.math.RoundingMode.HALF_UP)
+                : java.math.BigDecimal.ZERO;
+        var detailItems = new java.util.ArrayList<OrderProfitVO.ProfitItemDetail>();
+        for (var item : items) {
+            var ip = item.getTotalPrice().multiply(new java.math.BigDecimal("0.6"));
+            var ip2 = item.getTotalPrice().multiply(exchg).subtract(ip);
+            detailItems.add(OrderProfitVO.ProfitItemDetail.builder()
+                    .productName(item.getProductName()).salesTotal(item.getTotalPrice())
+                    .purchaseTotal(ip).itemProfit(ip2)
+                    .margin(item.getTotalPrice().compareTo(java.math.BigDecimal.ZERO) > 0
+                        ? ip2.multiply(new java.math.BigDecimal("100")).divide(item.getTotalPrice().multiply(exchg), 2, java.math.RoundingMode.HALF_UP)
+                        : java.math.BigDecimal.ZERO).build());
+        }
+        return OrderProfitVO.builder()
+                .orderId(orderId).orderNo(o.getOrderNo())
+                .totalSalesAmount(salesTotal).currency(o.getCurrency())
+                .exchangeRate(exchg).totalSalesCny(salesCny)
+                .totalPurchaseCost(purchaseTotal).estimatedProfit(profit).profitMargin(margin)
+                .items(detailItems).build();
+    }
 }
