@@ -5,7 +5,7 @@ export interface ApiResult<T = any> {
   code: number
   message: string
   data: T
-  timestamp?: number
+  timestamp?: string
 }
 
 /**
@@ -29,14 +29,12 @@ export interface PageQuery {
   orderDir?: 'asc' | 'desc'
 }
 
-/** 业务码（与后端 R.java 保持一致） */
+/** 业务码 — 与后端 erp-common R.java 一致：0=success, 401=unauth, 500=fail */
 export const BizCode = {
-  SUCCESS: 200,
-  BAD_REQUEST: 400,
+  SUCCESS: 0,
+  PARAM_INVALID: 400,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
-  CONFLICT: 409,
   SERVER_ERROR: 500,
-  BIZ_ERROR: 600,
 } as const

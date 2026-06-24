@@ -15,9 +15,10 @@ export const useUserStore = defineStore('user', () => {
 
   async function login(payload: LoginRequest) {
     const resp = await apiLogin(payload)
-    token.value = resp.token
+    // 后端字段：accessToken / refreshToken / userInfo
+    token.value = resp.accessToken
     userInfo.value = resp.userInfo
-    storage.set(StorageKey.TOKEN, resp.token)
+    storage.set(StorageKey.TOKEN, resp.accessToken)
     if (resp.refreshToken) storage.set(StorageKey.REFRESH_TOKEN, resp.refreshToken)
     storage.set(StorageKey.USER_INFO, resp.userInfo)
     return resp
@@ -51,7 +52,7 @@ export const useUserStore = defineStore('user', () => {
 
   function hasPermission(perm: string): boolean {
     if (!perm) return true
-    if (roles.value.includes('ADMIN')) return true
+    if (roles.value.includes('ROLE_ADMIN') || roles.value.includes('ADMIN')) return true
     return permissions.value.includes(perm)
   }
 

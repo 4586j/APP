@@ -169,4 +169,36 @@ const router = createRouter({
   routes,
 })
 
+// 路由守卫：未登录跳 /login，已登录访问 /login 跳首页
+import { useUserStore } from '@/store/user'
+import { storage, StorageKey } from '@/utils/storage'
+
+router.beforeEach((to, _from, next) => {
+  // 标题
+  if (to.meta?.title) {
+    document.title = `${to.meta.title} | 外贸 ERP`
+  }
+  const token = storage.get<string>(StorageKey.TOKEN)
+  if (to.path === '/login') {
+    if (token) return next('/dashboard')
+    return next()
+  }
+  if (!token) {
+    return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
+  // 已登录但 store 为空（刷新场景）：懒加载用户信息，失败时清 token 跳登录
+  const userStore = useUserStore()
+  if (!userStore.userInfo) {
+    userStore
+      .fetchProfile()
+      .then(() => next())
+      .catch(() => {
+        userStore.clear()
+        next({ path: '/login', query: { redirect: to.fullPath } })
+      })
+  } else {
+    next()
+  }
+})
+
 export default router
