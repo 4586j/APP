@@ -14,6 +14,7 @@ import com.erp.security.user.LoginUser;
 import com.erp.security.user.UserDetailsLoader;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,10 +24,10 @@ import org.springframework.util.StringUtils;
 import java.util.Objects;
 
 /**
- * 认证业务服务（B1.4 Phase 1）。
+ * 认证业务服务（B1.4 Phase 1，B1.5 增强）。
  *
- * <p>承担登录密码校验、签发 token、登出拉黑、查询当前用户。
- * 不在 Controller 写逻辑是为了 Phase 2/3（验证码、防暴力、refresh）扩展时只动这里。
+ * <p>承担登录密码校验、签发 token、登出拉黑、查询当前用户、改密、refresh。
+ * B1.5 接入失败锁定 + 登录时间/IP 落库（通过 UserDetailsLoader 回调）。
  */
 @Slf4j
 @Service
@@ -56,10 +57,13 @@ public class AuthService {
     /**
      * 登录：校验用户名 + BCrypt 密码，签发 access + refresh token。
      * 当 {@code app.security.captcha.enabled=true} 时，先校验验证码（错则 401）。
+     * B1.5：登录失败累计计数（达阈值锁定 15 分钟）；登录成功清零计数 + 写 lastLoginAt/Ip。
      *
-     * @throws BusinessException 用户不存在 / 密码错 / 验证码错误（统一 401，避免账号枚举）
+     * @param req     登录请求
+     * @param request 用于取 client IP（可为 null，单测时传 null）
+     * @throws BusinessException 用户不存在 / 密码错 / 验证码错（统一 401，避免账号枚举）
      */
-    public LoginResponse login(LoginRequest req) {
+    public LoginResponse login(LoginRequest req, HttpServletRequest request) {
         if (captchaProperties.isEnabled()) {
             if (!captchaService.verify(req.getCaptchaUuid(), req.getCaptchaCode())) {
                 log.info("登录失败：验证码错误 username={}", req.getUsername());
@@ -70,13 +74,18 @@ public class AuthService {
         try {
             user = userDetailsLoader.loadByUsername(req.getUsername());
         } catch (UsernameNotFoundException ex) {
-            log.info("登录失败：用户不存在 username={}", req.getUsername());
+            log.info("登录失败：用户不存在/已禁用/已锁定 username={}", req.getUsername());
             throw new BusinessException(R.CODE_UNAUTHORIZED, "用户名或密码错误");
         }
         if (user == null || !passwordEncoder.matches(req.getPassword(), user.getEncryptedPassword())) {
-            log.info("登录失败：密码错误 username={}", req.getUsername());
+            int failures = userDetailsLoader.onLoginFailure(req.getUsername());
+            log.info("登录失败：密码错误 username={}, failures={}", req.getUsername(), failures);
             throw new BusinessException(R.CODE_UNAUTHORIZED, "用户名或密码错误");
         }
+        // 登录成功
+        String ip = extractClientIp(request);
+        userDetailsLoader.onLoginSuccess(user.getUsername(), ip);
+
         String access = jwtTokenProvider.generateAccessToken(user.getId(), user.getUsername(), user.getRoles());
         String refresh = jwtTokenProvider.generateRefreshToken(user.getId(), user.getUsername(), user.getRoles());
         return LoginResponse.builder()
@@ -86,9 +95,13 @@ public class AuthService {
                 .build();
     }
 
+    /** 兼容老调用：不带 HttpServletRequest。 */
+    public LoginResponse login(LoginRequest req) {
+        return login(req, null);
+    }
+
     /**
      * 登出：解析 token 取出 jti，写 Redis 黑名单。
-     * token 为空或解析失败时视为无操作，幂等返回。
      */
     public void logout(String bearerToken) {
         String token = stripBearer(bearerToken);
@@ -104,9 +117,7 @@ public class AuthService {
         }
     }
 
-    /**
-     * 获取当前登录用户的 UserInfo（按登录名重新加载，保证最新权限）。
-     */
+    /** 获取当前登录用户的 UserInfo。 */
     public UserInfo currentUserInfo(String username) {
         if (!StringUtils.hasText(username)) {
             throw new BusinessException(R.CODE_UNAUTHORIZED, "未登录");
@@ -120,20 +131,6 @@ public class AuthService {
         return toUserInfo(user);
     }
 
-    /**
-     * 修改密码（B1.4 Phase 2）。校验：
-     * <ol>
-     *   <li>用户存在 + 旧密码匹配</li>
-     *   <li>新密码 ≠ 旧密码</li>
-     *   <li>newPassword == confirmPassword</li>
-     *   <li>新密码长度 ≥ 8（DTO 上 @Size 兜底；此处再校一遍防止有人绕过 valid）</li>
-     * </ol>
-     * 成功后立即把当前 access token 拉黑（迫使重新登录）。
-     *
-     * @param username      当前登录人
-     * @param req           请求体
-     * @param currentBearer 当前 Authorization 头（带 Bearer 前缀也可），用于拉黑当前 token
-     */
     public void changePassword(String username, ChangePasswordRequest req, String currentBearer) {
         if (!StringUtils.hasText(username)) {
             throw new BusinessException(R.CODE_UNAUTHORIZED, "未登录");
@@ -147,7 +144,6 @@ public class AuthService {
         if (Objects.equals(req.getOldPassword(), req.getNewPassword())) {
             throw new BusinessException(R.CODE_PARAM_INVALID, "新密码不能与旧密码相同");
         }
-
         LoginUser user;
         try {
             user = userDetailsLoader.loadByUsername(username);
@@ -158,26 +154,12 @@ public class AuthService {
             log.info("修改密码失败：旧密码不匹配 username={}", username);
             throw new BusinessException(R.CODE_PARAM_INVALID, "旧密码不正确");
         }
-
         String newEncrypted = passwordEncoder.encode(req.getNewPassword());
         userDetailsLoader.updatePassword(username, newEncrypted);
         log.info("用户 {} 修改密码成功", username);
-
-        // 拉黑当前 access token，迫使重新登录
         revokeBearer(currentBearer);
     }
 
-    /**
-     * 刷新 token（B1.4 Phase 2）：
-     * <ol>
-     *   <li>校验 JWT 合法（签名 + 未过期）</li>
-     *   <li>校验 {@code type == REFRESH}（access token 不能当 refresh 用）</li>
-     *   <li>校验未在黑名单</li>
-     *   <li>签发新 access + 新 refresh，并把旧 refresh 拉黑（防重放）</li>
-     * </ol>
-     *
-     * <p>userInfo 字段不重新查 DB，复用 token 内 claim 拼一个简版（节省 IO）。
-     */
     public LoginResponse refresh(String refreshTokenRaw) {
         String token = stripBearer(refreshTokenRaw);
         if (!StringUtils.hasText(token)) {
@@ -190,7 +172,6 @@ public class AuthService {
             log.info("refresh 失败：token 解析错误 {}", ex.getMessage());
             throw new BusinessException(R.CODE_UNAUTHORIZED, "refresh token 无效或已过期");
         }
-
         String typeStr = claims.get(JwtTokenProvider.CLAIM_TYPE, String.class);
         if (typeStr == null || TokenType.valueOf(typeStr) != TokenType.REFRESH) {
             throw new BusinessException(R.CODE_UNAUTHORIZED, "token 类型不正确，必须使用 refresh token");
@@ -198,7 +179,6 @@ public class AuthService {
         if (tokenBlacklist.isRevoked(claims.getId())) {
             throw new BusinessException(R.CODE_UNAUTHORIZED, "refresh token 已被撤销");
         }
-
         Number userIdNum = (Number) claims.get(JwtTokenProvider.CLAIM_USER_ID);
         Long userId = userIdNum == null ? null : userIdNum.longValue();
         String username = claims.get(JwtTokenProvider.CLAIM_USERNAME, String.class);
@@ -206,14 +186,12 @@ public class AuthService {
         java.util.List<String> roles =
                 (java.util.List<String>) claims.getOrDefault(JwtTokenProvider.CLAIM_ROLES, java.util.List.of());
 
-        // 旧 refresh 拉黑（一次性使用，防重放）
         long ttl = jwtTokenProvider.getRemainingMillis(token);
         tokenBlacklist.revoke(claims.getId(), ttl);
 
         String newAccess = jwtTokenProvider.generateAccessToken(userId, username, roles);
         String newRefresh = jwtTokenProvider.generateRefreshToken(userId, username, roles);
 
-        // userInfo 简版：从 claim 拼，不查 DB
         UserInfo info = UserInfo.builder()
                 .id(userId)
                 .username(username)
@@ -226,7 +204,6 @@ public class AuthService {
                 .build();
     }
 
-    /** 拉黑一个 Bearer/裸 token；token 不可解析时静默忽略（与登出一致）。 */
     private void revokeBearer(String bearer) {
         String token = stripBearer(bearer);
         if (!StringUtils.hasText(token)) {
@@ -253,10 +230,23 @@ public class AuthService {
                 .build();
     }
 
-    private static String stripBearer(String header) {
-        if (header == null) {
-            return null;
+    /** 取客户端 IP：优先 X-Forwarded-For 首段，否则 X-Real-IP，否则 remoteAddr。 */
+    static String extractClientIp(HttpServletRequest request) {
+        if (request == null) return "unknown";
+        String xff = request.getHeader("X-Forwarded-For");
+        if (StringUtils.hasText(xff)) {
+            int comma = xff.indexOf(',');
+            String first = (comma > 0 ? xff.substring(0, comma) : xff).trim();
+            if (StringUtils.hasText(first)) return first;
         }
+        String xri = request.getHeader("X-Real-IP");
+        if (StringUtils.hasText(xri)) return xri.trim();
+        String remote = request.getRemoteAddr();
+        return StringUtils.hasText(remote) ? remote : "unknown";
+    }
+
+    private static String stripBearer(String header) {
+        if (header == null) return null;
         return header.startsWith("Bearer ") ? header.substring(7).trim() : header.trim();
     }
 }

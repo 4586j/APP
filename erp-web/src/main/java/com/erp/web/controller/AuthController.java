@@ -24,9 +24,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 认证 Controller（B1.4 Phase 1 + Phase 2）。
- *
- * <p>对齐 API_DESIGN §2.x：login / logout / me / refresh / change-password / captcha。
+ * 认证 Controller（B1.4 Phase 1 + Phase 2，B1.5 加 IP 落库）。
+ * 对齐 API_DESIGN 第 2 章：login / logout / me / refresh / change-password / captcha。
  */
 @Slf4j
 @RestController
@@ -42,17 +41,14 @@ public class AuthController {
     }
 
     /**
-     * 登录（Phase 1：明文密码 + BCrypt；Phase 2：可选 captcha）。
+     * 登录（B1.5：把 HttpServletRequest 透给 AuthService 以提取 IP）。
      */
     @PostMapping("/login")
-    public R<LoginResponse> login(@Valid @RequestBody LoginRequest req) {
+    public R<LoginResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
         log.info("登录请求 username={}", req.getUsername());
-        return R.ok(authService.login(req));
+        return R.ok(authService.login(req, request));
     }
 
-    /**
-     * 登出：把当前 access token 的 jti 拉黑。
-     */
     @PostMapping("/logout")
     public R<Void> logout(HttpServletRequest request) {
         String bearer = request.getHeader(HttpHeaders.AUTHORIZATION);
@@ -60,9 +56,6 @@ public class AuthController {
         return R.ok();
     }
 
-    /**
-     * 当前用户信息（每次都从 UserDetailsLoader 重新加载，保证权限最新）。
-     */
     @GetMapping("/me")
     public R<UserInfo> me() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -72,10 +65,6 @@ public class AuthController {
         return R.ok(authService.currentUserInfo(auth.getName()));
     }
 
-    /**
-     * 修改密码（B1.4 Phase 2）。需登录态。
-     * 成功后当前 access token 立即拉黑，前端应跳登录页。
-     */
     @PostMapping("/change-password")
     public R<Void> changePassword(@Valid @RequestBody ChangePasswordRequest req,
                                   HttpServletRequest request) {
@@ -88,28 +77,16 @@ public class AuthController {
         return R.ok();
     }
 
-    /**
-     * 刷新 token（B1.4 Phase 2）。白名单接口，不要求登录态。
-     *
-     * <p>refresh token 来源：优先 body 里的 {@code refreshToken} 字段；
-     * 缺失时 fallback 到 {@code Authorization: Bearer <refreshToken>} 头。
-     * 成功后旧 refresh 立即拉黑（一次性、防重放）。
-     */
     @PostMapping("/refresh")
     public R<LoginResponse> refresh(@RequestBody(required = false) RefreshTokenRequest req,
                                     HttpServletRequest request) {
         String token = req == null ? null : req.getRefreshToken();
         if (!StringUtils.hasText(token)) {
-            // fallback：Authorization 头
             token = request.getHeader(HttpHeaders.AUTHORIZATION);
         }
         return R.ok(authService.refresh(token));
     }
 
-    /**
-     * 颁发验证码（B1.4 Phase 2）。白名单接口。
-     * 返回 uuid + PNG（data URL），答案在 Redis 中 TTL 5 分钟。
-     */
     @GetMapping("/captcha")
     public R<CaptchaResponse> captcha() {
         return R.ok(captchaService.generate());
