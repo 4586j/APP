@@ -152,9 +152,9 @@
 
 **Phase 3 — 业务接入 ⬜**
 - [⬜] `@RequirePermission("xxx:yyy")` 注解（AOP 实现）
-- [⬜] 前端 `login/index.vue` 接真 API（B1.5 之前先做基础流程）
-- [⬜] 路由守卫：未登录跳 `/login`、按 `permissions` 过滤菜单
-- [⬜] 前端登出清 Redis Token + 清本地
+- [✅] 前端 `login/index.vue` 接真 API（captcha + login + me 全链路）
+- [✅] 路由守卫：未登录跳 `/login`、刷新懒拉 `/me`（菜单按 permissions 过滤待 B1.5 erp-user 后）
+- [✅] 前端登出清 Redis Token + 清本地
 
 #### B1.5 erp-user（第 4 周）
 - [⬜] `sys_department` 树形 CRUD（含 `parent_id` + `dept_path`）
@@ -255,7 +255,7 @@
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
-**全局进度**：现状盘点 100% / 实际开发 ≈ 28%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / 共 12 commits 72 测试通过 + Flyway + 验证码/refresh/改密 闭环）
+**全局进度**：现状盘点 100% / 实际开发 ≈ 32%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / B1 前端登录 ✅ / 共 13 commits 72 测试通过 + Flyway + 验证码/refresh/改密 + 前端真链路登录闭环）
 
 ---
 
