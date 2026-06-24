@@ -52,7 +52,7 @@
 
 ---
 
-### ⬜ B0. 第 0 步 — 项目初始化与环境搭建（2-3 天，P0 阻塞）
+### ✅ B0. 第 0 步 — 项目初始化与环境搭建 ✅ 2026-06-24
 
 > **目标**：环境就绪、Maven 多模块编译通过、中间件运行
 
@@ -90,19 +90,20 @@
 
 ---
 
-### ⬜ B1. Phase 1 — 基础设施（第 1-4 周）
+### 🟢 B1. Phase 1 — 基础设施（第 1-4 周）进行中 ~ 80%
 
 > **目标**：用户能登录系统、看到侧边栏菜单
 > **里程碑**：登录 → 拿 JWT → 调 `/auth/me` → 进入仪表盘
 
-#### B1.1 erp-common（第 1 周）
-- [⬜] `BaseEntity`（id/version 乐观锁/created_at/updated_at/created_by/updated_by/deleted 软删除）
-- [⬜] `BaseItemEntity`（明细行基类）
-- [⬜] `R<T>` 统一响应、`PageResult<T>` 分页
-- [⬜] `BizException`（含 409 OptimisticLockConflict 预设）
-- [⬜] `GlobalExceptionHandler`（400/403/409/500）
-- [⬜] 基础枚举：`OrderStatusEnum` / `CurrencyEnum` / `DepartmentEnum`
-- [⬜] 工具类：`DateUtils` / `StringUtils`
+#### ✅ B1.1 erp-common ✅ 2026-06-24
+- [x] `BaseEntity`（id/version/created_at/updated_at/created_by/updated_by/deleted） — commit b3d2a8a
+- [x] `BaseItemEntity`（明细基类：id+createdAt+updatedAt，无逻辑删/乐观锁） — commit 2b13b2c
+- [x] `R<T>` 统一响应、`PageResult<T>` 分页 — commit b3d2a8a
+- [x] `BusinessException`（409 OptimisticLockConflict 预设） — commit b3d2a8a
+- [x] `GlobalExceptionHandler`（400/403/409/500）→ 放 erp-web（PITFALLS §10） — commit b3d2a8a
+- [x] 基础枚举：`EnableStatus` / `Department` / `Currency` / `OrderStatus`（带状态机校验） — commit 2b13b2c
+- [x] 工具类：`DateUtils` / `StringUtils` / `IdGenerator` — commit 88d5914
+- [x] 单元测试：45 个 @Test 通过（DateUtils 8 / IdGenerator 4 / StringUtils 13 / Currency 5 / Department 4 / OrderStatus 11）
 
 #### B1.2 Flyway + 数据库（第 1 周）
 - [⬜] `V1__init_system_tables.sql`（部门/用户/角色/权限 6 张表，从 `guide/erp_schema.sql` 截取）
@@ -110,26 +111,45 @@
 - [⬜] `application.yml` 启用 Flyway
 - [⬜] 启动验证 6 张系统表自动创建
 
-#### B1.3 前端初始化补齐（第 1 周）
-- [⬜] 包管理切到 pnpm（lock 切换）
-- [⬜] Vite 代理 `/api` → `localhost:8080`
-- [⬜] 缺失目录补齐：`api/` `utils/` `types/`
-- [⬜] `api/request.ts` Axios 实例 + 请求/响应拦截器（自动加 Token、401 跳登录、统一解响应壳）
-- [⬜] SCSS 全局变量 + element-plus 主题色定制
-- [⬜] vue-i18n 配置（en/zh）
+#### ✅ B1.3 前端初始化补齐 ✅ 2026-06-24
+- [x] 包管理切到 pnpm 9（npmmirror 镜像，pnpm-lock.yaml 64KB） — commit cb37982
+- [x] Vite 代理 `/api` → `localhost:8080`（已在 vite.config.ts）
+- [x] 缺失目录补齐：`api/` `utils/` `types/` `locales/` `styles/` — commit cb37982
+- [x] `api/request.ts` Axios 实例（token 注入 / R<T> 拆包 / 401 ElMessageBox 重登 / traceId）
+- [x] `api/auth.ts` `api/system.ts` 接口定义（对齐后端 erp-security）
+- [x] `types/api.ts` `types/auth.ts`（PageResult/PageQuery/BizCode/UserInfo/Department）
+- [x] `utils/storage.ts`（localStorage 前缀化）+ `utils/format.ts`（日期/金额/字节/截断）
+- [x] `store/user.ts` 真接 JWT（login/logout/fetchProfile/hasPermission，ADMIN 直通）
+- [x] SCSS 全局变量（品牌深蓝 #1d4ed8）+ Element Plus CSS var 覆盖
+- [x] vue-i18n 9（zh-CN / en-US，浏览器语言探测 + localStorage 持久化）
+- [x] vite dev 启动验证 OK（http://localhost:3000）
 
-#### B1.4 erp-security + 认证（第 2-3 周，按 API_DESIGN §2）
-- [⬜] `JwtTokenProvider` 生成 Access(30min) + Refresh(30day) Token
-- [⬜] `JwtAuthenticationFilter` 每请求拦截
-- [⬜] Redis Token 黑名单（登出加入）
-- [⬜] `@CurrentUser` / `@RequirePermission("xxx:yyy")` 注解
-- [⬜] `POST /auth/login`（含 RSA 公钥加密、防暴破 5次锁15分钟、验证码触发）
-- [⬜] `GET /auth/public-key` / `GET /auth/captcha`
-- [⬜] `POST /auth/refresh` / `POST /auth/refresh-permissions` / `POST /auth/logout`
-- [⬜] `GET /auth/me` / `PUT /auth/password`
-- [⬜] 前端 `login/index.vue` 接 RSA 加密登录流程
+#### 🟢 B1.4 erp-security + 认证（第 2-3 周）Phase 1 完成 ~ 50%
+
+**Phase 1 — 最小可用认证 ✅ 2026-06-24（commit 56d4f86，Claude 协作 + 我修依赖）**
+- [x] `JwtTokenProvider` 生成 Access(30min) + Refresh(30day) Token（jjwt 0.12.x 新 API）
+- [x] `JwtAuthenticationFilter` 每请求拦截（OncePerRequestFilter）
+- [x] Redis Token 黑名单（`TokenBlacklist`，对 Redis 异常 fail-open）
+- [x] `@CurrentUser` 注解 + `CurrentUserArgumentResolver`（@RequirePermission 留 Phase 3）
+- [x] `POST /api/v1/auth/login`（明文密码 + BCrypt 校验，RSA/防暴破/验证码留 Phase 2）
+- [x] `POST /api/v1/auth/logout`（拉黑当前 JWT）
+- [x] `GET  /api/v1/auth/me`
+- [x] `InMemoryUserDetailsLoader` dev profile 内存用户（admin/123456）
+- [x] 测试：5 个 JwtTokenProviderTest + 5 个 AuthControllerTest + 1 个 ErpApplicationTests
+- [x] **修依赖**：erp-security/pom.xml 加 spring-boot-starter-web（PITFALLS §12）
+
+**Phase 2 — 防护升级 ⬜**
+- [⬜] `POST /auth/login` 加 RSA 公钥加密（`GET /auth/public-key`）
+- [⬜] `GET /auth/captcha` 验证码 + 防暴破 5 次锁 15 分钟
+- [⬜] `POST /auth/refresh` 用 refresh token 换新 access
+- [⬜] `PUT /auth/password` 修改密码
+- [⬜] `POST /auth/refresh-permissions`
+
+**Phase 3 — 业务接入 ⬜**
+- [⬜] `@RequirePermission("xxx:yyy")` 注解（AOP 实现）
+- [⬜] 前端 `login/index.vue` 接真 API（B1.5 之前先做基础流程）
 - [⬜] 路由守卫：未登录跳 `/login`、按 `permissions` 过滤菜单
-- [⬜] 前端登出清 Redis Token（调 `/logout` 后清本地）
+- [⬜] 前端登出清 Redis Token + 清本地
 
 #### B1.5 erp-user（第 4 周）
 - [⬜] `sys_department` 树形 CRUD（含 `parent_id` + `dept_path`）
@@ -220,8 +240,8 @@
 | 阶段 | 任务数 | 已完成 | 进行中 | 待办 | 完成率 |
 |------|--------|--------|--------|------|--------|
 | **A 现有资产** | 4 | 4 | 0 | 0 | 100% |
-| **B0 初始化** | 4 | 0 | 0 | 4 | 0% |
-| **B1 基础设施** | 5 | 0 | 0 | 5 | 0% |
+| **B0 初始化** | 4 | 3 | 1 | 0 | 75% |
+| **B1 基础设施** | 5 | 3 | 1 | 1 | 60% |
 | **B2 产品/客户** | 4 | 0 | 0 | 4 | 0% |
 | **B3 订单（核心）** | 6 | 0 | 0 | 6 | 0% |
 | **B4 财务/审批** | 5 | 0 | 0 | 5 | 0% |
@@ -230,7 +250,7 @@
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
-**全局进度**：现状盘点完成 100% / 实际开发 0%（待启动 B0 第 0 步）
+**全局进度**：现状盘点 100% / 实际开发 ≈ 18%（B0 ✅ / B1.1 ✅ / B1.3 ✅ / B1.4 Phase 1 ✅ / 共 10 commits 56 测试通过）
 
 ---
 
@@ -271,3 +291,8 @@
 | 日期 | 变更 | 负责 |
 |------|------|------|
 | 2026-06-24 | ROADMAP 初版创建：盘点现有资产 + 基于 DEV_STEPS 拆解 9 阶段 51 任务 | 系统 |
+| 2026-06-24 | B0 完成（JDK17/Maven/14 子模块/编译验证），commit 6b190e7→b3d2a8a | 实施 |
+| 2026-06-24 | B1.1 完成（erp-common 9 类 + 45 单测），commit 88d5914 + 2b13b2c | 实施 |
+| 2026-06-24 | B1.3 完成（前端基建 pnpm/axios/i18n/JWT store/主题），commit cb37982 | 实施 |
+| 2026-06-24 | B1.4 Phase 1 完成（erp-security JWT 最小认证 + 11 单测），commit 56d4f86 | 实施 + Claude 协作 |
+| 2026-06-24 | PITFALLS 追加 §12（erp-security 缺 starter-web）| 实施 |

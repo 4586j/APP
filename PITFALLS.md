@@ -379,3 +379,48 @@ class ErpApplicationTests {}
 **B1.1 阶段**：装好 MySQL/Redis 后改回标准 `@SpringBootTest`，让 Flyway 真正运行迁移。
 
 **经验**：跨阶段的临时绕过要在代码注释 + PITFALLS 留痕，避免 B1.1 时忘记还原。
+
+---
+
+## §12 erp-security 只引 starter-security 不引 starter-web → 编译炸【B1.4】
+
+**症状**：B1.4 让 Claude 写完 14 个 Java 文件，跑 `mvn -pl erp-security,erp-web -am compile`：
+
+```
+JwtAuthenticationFilter.java:[8,23] package jakarta.servlet does not exist
+JwtAuthenticationFilter.java:[39,8] cannot access jakarta.servlet.Filter
+JwtAuthenticationFilter.java:[53,46] cannot find symbol (HttpServletRequest)
+SecurityConfig.java:[63,34] JwtAuthenticationFilter cannot be converted to jakarta.servlet.Filter
+... 级联 30+ 个 cannot find symbol
+```
+
+**根因**：`erp-security/pom.xml` 只引了：
+- `spring-boot-starter-security`（带 spring-security-core/web/config）
+- `spring-boot-starter-data-redis`
+
+但 `OncePerRequestFilter` / `HttpServletRequest` / `Filter` 这些 servlet API 在
+`spring-web` 模块里，而 `spring-web` 是由 `spring-boot-starter-web`（带 tomcat-embed）
+传递进来的，**`starter-security` 不包含**。
+
+**典型迷惑点**：`spring-security-web` 里有 `OncePerRequestFilter`，确实就在 starter-security
+传递依赖里能找到，但它 `extends GenericFilterBean` 需要 `jakarta.servlet.Filter` 接口——
+这个接口在 `tomcat-embed-core`（由 starter-web 引入）里。所以 IDE 跳转能看到符号，但 javac 编译失败。
+
+**解决**：erp-security/pom.xml 加 starter-web：
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+```
+
+加完后 `mvn compile` 一次通过，`mvn test` 全模块 56 个测试 0 失败。
+
+**经验**：
+1. 任何模块写 `JwtAuthenticationFilter` / `OncePerRequestFilter` / Servlet API，都必须显式
+   引 `starter-web`，**不能依赖 starter-security 传递**
+2. Claude Code 写完不跑测试时（`-p` 模式 + acceptEdits 拦了 mvn），人工必须立刻
+   `mvn compile` 兜底；它在 TASK_REPORT 里说"预期通过"≠ 实际通过
+3. dependencyManagement 在父 pom 锁了版本，子模块加依赖**不需要写 version**，但**必须显式加**
+
