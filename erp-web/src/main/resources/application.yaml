@@ -1,0 +1,20 @@
+spring:
+  profiles:
+    active: dev
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+      connect-timeout: 2000ms
+
+app:
+  security:
+    jwt:
+      secret: "change-me-in-prod-this-must-be-at-least-256-bit-key-padding-XXXXXXXX"
+      access-token-expire-minutes: 30
+      refresh-token-expire-days: 30
+
+logging:
+  level:
+    com.erp: DEBUG
