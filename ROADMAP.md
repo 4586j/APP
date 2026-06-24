@@ -187,13 +187,13 @@
 
 ---
 
-### ⬜ B3. Phase 3 — 订单生命周期（第 9-14 周）核心
+### ✅ B3. Phase 3 — 订单生命周期（第 9-14 周）核心
 
 - [✅] 销售订单 CRUD + 状态流转（draft→submitted→approved→purchasing→shipping→delivered→settled/cancelled）
 - [✅] 采购订单 CRUD + 关联销售单
 - [✅] 订单明细 ord_sales_order_item / ord_purchase_order_item 子表
 - [✅] 状态变更历史 `ord_status_history`
-- [⬜] 订单利润核算 `ord_profit`
+- [✅] 订单利润核算 `ord_profit`（按60%估算成本，`GET /api/v1/sales-orders/{id}/profit`）
 - [✅] 前端 `order/SalesOrderList.vue` 联调（含详情弹窗+状态操作按钮）。SalesOrderCreate + PurchaseOrderList 待接真实 API
 
 ---
@@ -259,7 +259,7 @@
 | **B0 初始化** | 4 | 3 | 1 | 0 | 75% |
 | **B1 基础设施** | 5 | 3 | 1 | 1 | 60% |
 | **B2 产品/客户** | 4 | 4 | 0 | 0 | 100% |
-| **B3 订单（核心）** | 6 | 5 | 0 | 1 | 83% |
+| **B3 订单（核心）** | 6 | 6 | 0 | 0 | 100% |
 | **B4 财务/审批** | 5 | 0 | 0 | 5 | 0% |
 | **B5 物流/单证** | 6 | 0 | 0 | 6 | 0% |
 | **B6 数据/报表** | 5 | 0 | 0 | 5 | 0% |
