@@ -13,17 +13,13 @@
       active-text-color="#fff"
       class="side-menu"
     >
-      <template v-for="item in menuItems" :key="item.path">
-        <el-sub-menu v-if="item.children" :index="item.path">
+      <template v-for="item in visibleMenuItems" :key="item.path">
+        <el-sub-menu v-if="item.children?.length" :index="item.path">
           <template #title>
             <el-icon><component :is="item.icon" /></el-icon>
             <span>{{ item.title }}</span>
           </template>
-          <el-menu-item
-            v-for="child in item.children"
-            :key="child.path"
-            :index="child.path"
-          >
+          <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
             <span>{{ child.title }}</span>
           </el-menu-item>
         </el-sub-menu>
@@ -42,65 +38,73 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useUserStore } from '@/store/user'
 
 defineProps<{ collapsed: boolean }>()
 
+interface MenuItem {
+  path: string
+  title: string
+  icon?: string
+  permission?: string
+  alwaysShow?: boolean
+  children?: MenuItem[]
+}
+
 const route = useRoute()
+const userStore = useUserStore()
 const activeMenu = computed(() => route.path)
 
-const menuItems = [
-  { path: '/dashboard', title: '仪表盘', icon: 'Odometer' },
+const menuItems: MenuItem[] = [
+  { path: '/dashboard', title: '仪表盘', icon: 'Odometer', alwaysShow: true },
   {
-    path: '/order',
-    title: '订单管理',
-    icon: 'Document',
-    children: [
-      { path: '/order/sales', title: '销售订单' },
-      { path: '/order/purchase', title: '采购订单' },
+    path: '/order', title: '订单管理', icon: 'Document', permission: 'order:view', children: [
+      { path: '/order/sales', title: '销售订单', permission: 'order:view' },
+      { path: '/order/purchase', title: '采购订单', permission: 'order:view' },
     ],
   },
-  { path: '/product', title: '产品管理', icon: 'Goods' },
+  { path: '/product', title: '产品管理', icon: 'Goods', permission: 'product:view' },
   {
-    path: '/customer',
-    title: '客户管理',
-    icon: 'User',
-    children: [
-      { path: '/customer/list', title: '客户列表' },
-      { path: '/customer/supplier', title: '供应商列表' },
+    path: '/customer', title: '客户管理', icon: 'User', permission: 'customer:view', children: [
+      { path: '/customer/list', title: '客户列表', permission: 'customer:view' },
+      { path: '/customer/supplier', title: '供应商列表', permission: 'supplier:view' },
     ],
   },
   {
-    path: '/finance',
-    title: '财务管理',
-    icon: 'Money',
-    children: [
-      { path: '/finance/overview', title: '财务概览' },
-      { path: '/finance/exchange-rate', title: '汇率管理' },
-      { path: '/finance/fund', title: '资金审批' },
+    path: '/finance', title: '财务管理', icon: 'Money', permission: 'finance:view', children: [
+      { path: '/finance/overview', title: '财务概览', permission: 'finance:view' },
+      { path: '/finance/exchange-rate', title: '汇率管理', permission: 'exchange-rate:view' },
+      { path: '/finance/fund', title: '资金审批', permission: 'fund:view' },
     ],
   },
-  { path: '/logistics', title: '物流管理', icon: 'Ship' },
-  { path: '/document', title: '单证管理', icon: 'Files' },
+  { path: '/logistics', title: '物流管理', icon: 'Ship', permission: 'logistics:view' },
+  { path: '/document', title: '单证管理', icon: 'Files', permission: 'document:view' },
   {
-    path: '/data',
-    title: '数据中心',
-    icon: 'DataAnalysis',
-    children: [
-      { path: '/data/upload', title: '数据上传' },
-      { path: '/data/analysis', title: '定价分析' },
+    path: '/data', title: '数据中心', icon: 'DataAnalysis', permission: 'data:view', children: [
+      { path: '/data/upload', title: '数据上传', permission: 'data:view' },
+      { path: '/data/analysis', title: '定价分析', permission: 'data:view' },
     ],
   },
-  { path: '/approval', title: '审批中心', icon: 'Stamp' },
+  { path: '/approval', title: '审批中心', icon: 'Stamp', permission: 'approval:view' },
   {
-    path: '/system',
-    title: '系统管理',
-    icon: 'Setting',
-    children: [
-      { path: '/system/user', title: '用户管理' },
-      { path: '/system/role', title: '角色管理' },
+    path: '/system', title: '系统管理', icon: 'Setting', permission: 'system', children: [
+      { path: '/system/user', title: '用户管理', permission: 'system:user' },
+      { path: '/system/role', title: '角色管理', permission: 'system:role' },
     ],
   },
 ]
+
+function canShow(item: MenuItem) {
+  const permissions = userStore.permissions
+  return item.alwaysShow || !item.permission || permissions.includes(item.permission)
+}
+
+const visibleMenuItems = computed(() => menuItems
+  .map((item) => {
+    const children = item.children?.filter(canShow)
+    return { ...item, children }
+  })
+  .filter((item) => canShow(item) || Boolean(item.children?.length)))
 </script>
 
 <style scoped lang="scss">
@@ -117,11 +121,8 @@ const menuItems = [
   z-index: 1001;
   overflow-x: hidden;
 
-  &.collapsed {
-    width: 64px;
-  }
+  &.collapsed { width: 64px; }
 }
-
 .logo {
   height: 56px;
   display: flex;
@@ -134,23 +135,15 @@ const menuItems = [
   letter-spacing: 1px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
-
-  .logo-text {
-    white-space: nowrap;
-  }
+  .logo-text { white-space: nowrap; }
 }
-
 .side-menu {
   flex: 1;
   border-right: none;
   overflow-y: auto;
   overflow-x: hidden;
-
-  &:not(.el-menu--collapse) {
-    width: 220px;
-  }
+  &:not(.el-menu--collapse) { width: 220px; }
 }
-
 .sidebar-footer {
   padding: 12px 20px;
   color: rgba(255, 255, 255, 0.35);

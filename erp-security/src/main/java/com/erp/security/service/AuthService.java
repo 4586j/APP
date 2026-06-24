@@ -86,7 +86,7 @@ public class AuthService {
         String ip = extractClientIp(request);
         userDetailsLoader.onLoginSuccess(user.getUsername(), ip);
 
-        String access = jwtTokenProvider.generateAccessToken(user.getId(), user.getUsername(), user.getRoles());
+        String access = jwtTokenProvider.generateAccessToken(user.getId(), user.getUsername(), user.getRoles(), user.getPermissions());
         String refresh = jwtTokenProvider.generateRefreshToken(user.getId(), user.getUsername(), user.getRoles());
         return LoginResponse.builder()
                 .accessToken(access)
@@ -189,13 +189,17 @@ public class AuthService {
         long ttl = jwtTokenProvider.getRemainingMillis(token);
         tokenBlacklist.revoke(claims.getId(), ttl);
 
-        String newAccess = jwtTokenProvider.generateAccessToken(userId, username, roles);
-        String newRefresh = jwtTokenProvider.generateRefreshToken(userId, username, roles);
+        LoginUser refreshedUser = userDetailsLoader.loadByUsername(username);
+        java.util.List<String> refreshedRoles = refreshedUser.getRoles() == null ? roles : refreshedUser.getRoles();
+        java.util.List<String> refreshedPermissions = refreshedUser.getPermissions() == null ? java.util.List.of() : refreshedUser.getPermissions();
+        String newAccess = jwtTokenProvider.generateAccessToken(userId, username, refreshedRoles, refreshedPermissions);
+        String newRefresh = jwtTokenProvider.generateRefreshToken(userId, username, refreshedRoles);
 
         UserInfo info = UserInfo.builder()
                 .id(userId)
                 .username(username)
-                .roles(roles)
+                .roles(refreshedRoles)
+                .permissions(refreshedPermissions)
                 .build();
         return LoginResponse.builder()
                 .accessToken(newAccess)

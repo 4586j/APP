@@ -63,6 +63,7 @@
 </template>
 
 <script setup lang="ts">
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 import { ref, onMounted } from 'vue'
 
 const today = new Date().toLocaleDateString('zh-CN')
@@ -82,7 +83,7 @@ const recentOrders = [
   { orderNo: 'SO20260611005', customer: 'Asia Partners Ltd.', amount: 89200, status: 'settled', date: '2026-06-11' },
 ]
 
-const todos = [
+const todos: Array<{ text: string; tag: string; tagType: TagType; color: string }> = [
   { text: '销售订单 SO20260615001 等待审批', color: '#e6a23c', tag: '审批', tagType: 'warning' as const },
   { text: '资金申请 FA20260614002 需要财务审批', color: '#e6a23c', tag: '审批', tagType: 'warning' as const },
   { text: '采购订单 PO20260613001 已到港待提货', color: '#2563eb', tag: '物流', tagType: 'primary' as const },
@@ -90,8 +91,8 @@ const todos = [
   { text: '客户 DEF Corp 信用额度即将超限', color: '#f56c6c', tag: '预警', tagType: 'danger' as const },
 ]
 
-function statusType(status: string): string {
-  const map: Record<string, string> = { submitted: 'warning', approved: '', shipped: 'success', delivered: 'success', settled: 'info' }
+function statusType(status: string): TagType {
+  const map: Record<string, TagType> = { submitted: 'warning', approved: 'info', shipped: 'success', delivered: 'success', settled: 'info' }
   return map[status] || 'info'
 }
 function statusLabel(status: string): string {

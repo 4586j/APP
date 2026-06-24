@@ -69,13 +69,14 @@
 </template>
 
 <script setup lang="ts">
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 import { reactive } from 'vue'
 import { Search, Plus, Download } from '@element-plus/icons-vue'
 
 const query = reactive({ poNo: '', supplierId: null, status: '' })
 
-function statusType(s: string) {
-  const m: Record<string, string> = { draft: 'info', sent: 'warning', confirmed: '', in_transit: 'primary', received: 'success' }
+function statusType(s: string): TagType {
+  const m: Record<string, TagType> = { draft: 'info', sent: 'warning', confirmed: 'info', in_transit: 'primary', received: 'success' }
   return m[s] || 'info'
 }
 function statusLabel(s: string) {

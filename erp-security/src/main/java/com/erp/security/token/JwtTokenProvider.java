@@ -36,6 +36,9 @@ public class JwtTokenProvider {
     /** Claim：角色列表。 */
     public static final String CLAIM_ROLES = "roles";
 
+    /** 权限编码 claim。 */
+    public static final String CLAIM_PERMISSIONS = "permissions";
+
     /** Claim：token 类型（access/refresh）。 */
     public static final String CLAIM_TYPE = "type";
 
@@ -75,17 +78,24 @@ public class JwtTokenProvider {
      * @return JWT 字符串
      */
     public String generateAccessToken(Long userId, String username, List<String> roles) {
-        return buildToken(userId, username, roles, TokenType.ACCESS, accessExpireMillis);
+        return generateAccessToken(userId, username, roles, List.of());
+    }
+
+    /**
+     * 生成 access token，包含角色 + 权限编码。
+     */
+    public String generateAccessToken(Long userId, String username, List<String> roles, List<String> permissions) {
+        return buildToken(userId, username, roles, permissions, TokenType.ACCESS, accessExpireMillis);
     }
 
     /**
      * 生成 refresh token。
      */
     public String generateRefreshToken(Long userId, String username, List<String> roles) {
-        return buildToken(userId, username, roles, TokenType.REFRESH, refreshExpireMillis);
+        return buildToken(userId, username, roles, List.of(), TokenType.REFRESH, refreshExpireMillis);
     }
 
-    private String buildToken(Long userId, String username, List<String> roles,
+    private String buildToken(Long userId, String username, List<String> roles, List<String> permissions,
                               TokenType type, long ttlMillis) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
@@ -97,6 +107,7 @@ public class JwtTokenProvider {
                         CLAIM_USER_ID, userId,
                         CLAIM_USERNAME, username,
                         CLAIM_ROLES, roles == null ? List.of() : roles,
+                        CLAIM_PERMISSIONS, permissions == null ? List.of() : permissions,
                         CLAIM_TYPE, type.name()
                 ))
                 .signWith(signingKey)

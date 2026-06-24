@@ -74,14 +74,15 @@
 </template>
 
 <script setup lang="ts">
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 import { ref, reactive, computed } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 
 const activeTab = ref('pending')
 const query = reactive({ type: '', status: '' })
 
-function statusType(s: string) {
-  const m: Record<string, string> = { pending: 'warning', approved: 'success', rejected: 'danger' }
+function statusType(s: string): TagType {
+  const m: Record<string, TagType> = { pending: 'warning', approved: 'success', rejected: 'danger' }
   return m[s] || ''
 }
 function statusLabel(s: string) {

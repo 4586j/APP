@@ -630,3 +630,55 @@ ALTER TABLE sys_permission ADD COLUMN created_by BIGINT, ADD COLUMN updated_by B
 
 **入坑日期**：2026-06-24（B1.5 收尾）  
 **修复 commit**：V3 migration + 后续 commit
+
+
+---
+
+## 30. JWT authorities 只带 roles，不带 permissions
+
+### 现象
+B1.6 前端接真实 `/api/v1/system/*` 后：
+- `POST /auth/login` 正常返回 JWT
+- `/auth/me` 能看到 24 条 DB 权限
+- 但 `GET /system/users` 返回 500，日志本质是：
+
+```text
+org.springframework.security.authorization.AuthorizationDeniedException: Access Denied
+```
+
+### 根因
+`JwtTokenProvider` 只把 `roles` 写进 access token；`JwtAuthenticationFilter` 也只把 `roles` 转成 `SimpleGrantedAuthority`。
+
+但系统接口用的是按钮/操作权限：
+
+```java
+@PreAuthorize("hasAuthority('user:view')")
+@PreAuthorize("hasAuthority('role:assign-perm')")
+```
+
+所以用户即使在 `/me` 里有 permissions，进入 Spring Security MethodSecurity 时也没有对应 authority。
+
+### 治法
+- access token 增加 `permissions` claim
+- `JwtAuthenticationFilter` 组装 authorities 时使用 `roles + permissions`，并 `distinct()` 去重
+- refresh token 换 access 时重新从 `UserDetailsLoader` 加载用户权限
+
+### 同期修复
+- Controller 权限码对齐 V2 seed：
+  - `user:assign` → `user:assign-role`
+  - `role:assign` → `role:assign-perm`
+- `RoleVO.permissionIds` 从 `sys_role_permission` 回填，避免角色权限保存时传 `null`
+
+### 验证
+- `/system/users?page=1&size=10` → 200 ✅
+- `/system/roles` → 200 ✅
+- `/system/permissions/tree` → 200 ✅
+- `/system/departments` → 200 ✅
+- `/system/roles/1/permissions` → 200 + `code=0 ok` ✅
+- `mvn test` → 通过 ✅
+- `pnpm build` → 通过 ✅
+
+### 一句话教训
+> 前后端权限模型要统一：如果接口用 `hasAuthority('xxx:yyy')`，JWT/SecurityContext 里就必须放权限码，不只是角色码。
+
+**入坑日期**：2026-06-25（B1.6 系统管理联调）

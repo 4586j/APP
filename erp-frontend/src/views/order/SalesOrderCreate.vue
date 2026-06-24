@@ -204,7 +204,7 @@ const totalAmount = computed(() =>
 const cnyAmount = computed(() => Math.round(totalAmount.value * 7.25))
 
 function addItem() {
-  form.items.push({ productId: null, hsCode: '', quantity: 1, unitPrice: 0, specification: '' })
+  form.items.push({ productId: 1, hsCode: '', quantity: 1, unitPrice: 0, specification: '' })
 }
 function removeItem(index: number) {
   if (form.items.length > 1) form.items.splice(index, 1)

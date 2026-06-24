@@ -153,7 +153,7 @@
 **Phase 3 — 业务接入 ⬜**
 - [⬜] `@RequirePermission("xxx:yyy")` 注解（AOP 实现）
 - [✅] 前端 `login/index.vue` 接真 API（captcha + login + me 全链路）
-- [✅] 路由守卫：未登录跳 `/login`、刷新懒拉 `/me`（菜单按 permissions 过滤待 B1.5 erp-user 后）
+- [✅] 路由守卫：未登录跳 `/login`、刷新懒拉 `/me`、菜单按 DB permissions 过滤
 - [✅] 前端登出清 Redis Token + 清本地
 
 #### B1.5 erp-user（第 4 周）后端 ✅ · DB 登录端到端 ✅
@@ -163,7 +163,7 @@
 - [✅] `sys_permission` CRUD（菜单+按钮+API，含 `http_method`）
 - [✅] 用户-角色绑定、角色-权限绑定
 - [✅] 管理员重置密码、用户改密（接口）
-- [⬜] 前端 `system/UserManage.vue` / `RoleManage.vue` 联调
+- [✅] 前端 `system/UserManage.vue` / `RoleManage.vue` 联调（用户/角色/权限/部门真实接口 + 权限树保存）
 - [✅] `MysqlUserDetailsLoader` 装配修复（`@ConditionalOnProperty` 替换 `@ConditionalOnBean`）
 - [✅] DB 列对齐（V3 migration：sys_user/department/role/permission 补 `created_by`/`updated_by`/`version`）
 - [✅] 生产端到端：MySQL 登录 200 + JWT + /me 返回 24 条 DB 权限
@@ -258,7 +258,7 @@
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
-**全局进度**：现状盘点 100% / 实际开发 ≈ 36%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / B1 前端登录 ✅ / **B1.5 erp-user 后端 ✅**（@ConditionalOnProperty 修复装配时序）/ 共 17 commits 71 测试通过 + Flyway V3 + MySQL DB 登录端到端跑通（admin 拿到 24 条 DB 权限））
+**全局进度**：现状盘点 100% / 实际开发 ≈ 39%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / B1 前端登录 ✅ / **B1.5 erp-user 后端 ✅** / **B1.6 系统管理前端联调 ✅** / 共 17 commits 71 测试通过 + Flyway V3 + MySQL DB 登录端到端跑通（admin 拿到 24 条 DB 权限））
 
 ---
 

@@ -2,7 +2,7 @@
   <div class="app-layout">
     <Sidebar :collapsed="collapsed" />
     <div class="main-area" :class="{ collapsed: collapsed }">
-      <Navbar @toggle="collapsed = !collapsed" />
+      <Navbar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
       <div class="app-content">
         <router-view />
       </div>

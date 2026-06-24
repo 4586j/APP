@@ -23,5 +23,5 @@ public class UserController {
     @PutMapping("/{id}/lock") @PreAuthorize("hasAuthority('user:update')") public R<Void> lock(@PathVariable Long id) { userService.lockUser(id); return R.ok(); }
     @PutMapping("/{id}/unlock") @PreAuthorize("hasAuthority('user:update')") public R<Void> unlock(@PathVariable Long id) { userService.unlockUser(id); return R.ok(); }
     @PutMapping("/{id}/reset-password") @PreAuthorize("hasAuthority('user:update')") public R<Void> resetPassword(@PathVariable Long id, @Valid @RequestBody ResetPasswordRequest req) { userService.resetPassword(id, req.getNewPassword()); return R.ok(); }
-    @PutMapping("/{id}/roles") @PreAuthorize("hasAuthority('role:assign')") public R<Void> assignRoles(@PathVariable Long id, @Valid @RequestBody AssignRolesRequest req) { userService.assignRoles(id, req.getRoleIds()); return R.ok(); }
+    @PutMapping("/{id}/roles") @PreAuthorize("hasAuthority('user:assign-role')") public R<Void> assignRoles(@PathVariable Long id, @Valid @RequestBody AssignRolesRequest req) { userService.assignRoles(id, req.getRoleIds()); return R.ok(); }
 }

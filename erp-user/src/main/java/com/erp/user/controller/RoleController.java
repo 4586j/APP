@@ -21,5 +21,5 @@ public class RoleController {
     @PostMapping @PreAuthorize("hasAuthority('role:create')") public R<Long> create(@Valid @RequestBody RoleCreateRequest req) { return R.ok(roleService.create(req)); }
     @PutMapping("/{id}") @PreAuthorize("hasAuthority('role:update')") public R<Void> update(@PathVariable Long id, @Valid @RequestBody RoleUpdateRequest req) { roleService.update(id, req); return R.ok(); }
     @DeleteMapping("/{id}") @PreAuthorize("hasAuthority('role:delete')") public R<Void> delete(@PathVariable Long id) { roleService.delete(id); return R.ok(); }
-    @PutMapping("/{id}/permissions") @PreAuthorize("hasAuthority('role:assign')") public R<Void> assignPermissions(@PathVariable Long id, @Valid @RequestBody AssignPermissionsRequest req) { roleService.assignPermissions(id, req.getPermissionIds()); return R.ok(); }
+    @PutMapping("/{id}/permissions") @PreAuthorize("hasAuthority('role:assign-perm')") public R<Void> assignPermissions(@PathVariable Long id, @Valid @RequestBody AssignPermissionsRequest req) { roleService.assignPermissions(id, req.getPermissionIds()); return R.ok(); }
 }

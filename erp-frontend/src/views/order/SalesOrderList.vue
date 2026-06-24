@@ -83,16 +83,17 @@
 </template>
 
 <script setup lang="ts">
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 import { reactive } from 'vue'
 import { Search, Refresh, Download, Plus } from '@element-plus/icons-vue'
 
 const query = reactive({ orderNo: '', customerId: null, status: '', dateRange: null })
 
-const statusMap: Record<string, { type: string; label: string }> = {
+const statusMap: Record<string, { type: TagType; label: string }> = {
   draft: { type: 'info', label: '草稿' },
   submitted: { type: 'warning', label: '待审批' },
-  approved: { type: '', label: '已审批' },
-  sourcing: { type: '', label: '采购中' },
+  approved: { type: 'info', label: '已审批' },
+  sourcing: { type: 'info', label: '采购中' },
   funded: { type: 'primary', label: '已拨款' },
   shipped: { type: 'success', label: '已发货' },
   delivered: { type: 'success', label: '已交付' },
