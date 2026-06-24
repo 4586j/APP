@@ -6,6 +6,8 @@ import com.erp.common.model.R;
 import com.erp.order.dto.*;
 import com.erp.order.entity.*;
 import com.erp.order.mapper.*;
+import com.erp.customer.mapper.CustCustomerMapper;
+import com.erp.customer.entity.CustCustomer;
 import com.erp.order.service.OrdSalesOrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,12 +20,19 @@ public class OrdSalesOrderServiceImpl implements OrdSalesOrderService {
     final OrdSalesOrderMapper orderMapper;
     final OrdSalesOrderItemMapper itemMapper;
     final OrdStatusHistoryMapper historyMapper;
+    final CustCustomerMapper customerMapper;
 
     SalesOrderVO toVO(OrdSalesOrder o) {
         var items = itemMapper.selectList(new LambdaQueryWrapper<OrdSalesOrderItem>()
                 .eq(OrdSalesOrderItem::getOrderId, o.getId()).orderByAsc(OrdSalesOrderItem::getLineNo));
+        // 查询客户名称
+        String custName = null;
+        if (o.getCustomerId() != null) {
+            var cust = customerMapper.selectById(o.getCustomerId());
+            if (cust != null) custName = cust.getCustomerName();
+        }
         return SalesOrderVO.builder().id(o.getId()).orderNo(o.getOrderNo())
-            .customerId(o.getCustomerId()).customerOrderNo(o.getCustomerOrderNo())
+            .customerId(o.getCustomerId()).customerName(custName).customerOrderNo(o.getCustomerOrderNo())
             .orderDate(o.getOrderDate()).currency(o.getCurrency())
             .tradeTerms(o.getTradeTerms()).paymentTerms(o.getPaymentTerms())
             .portLoading(o.getPortLoading()).portDestination(o.getPortDestination())

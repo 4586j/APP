@@ -24,6 +24,10 @@
             <artifactId>erp-security</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.erp</groupId>
+            <artifactId>erp-customer</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>

@@ -35,3 +35,21 @@ export function getSalesOrder(id: number) { return get<SalesOrderVO>('/sales-ord
 export function createSalesOrder(data: SalesOrderCreateRequest) { return post<SalesOrderVO>('/sales-orders', data) }
 export function updateSalesOrderStatus(id: number, toStatus: string, remark?: string) { return put<SalesOrderVO>('/sales-orders/' + id + '/status', { toStatus, remark }) }
 export function deleteSalesOrder(id: number) { return del<void>('/sales-orders/' + id) }
+
+/* ---- 采购订单 ---- */
+export interface PurchaseOrderQuery {
+  page?: number; size?: number; keyword?: string; supplierId?: number; status?: string
+}
+export interface PurchaseOrderItemVO {
+  id?: number; lineNo?: number; productId: number; productName?: string
+  quantity: number; unitPrice: number; totalPrice?: number
+}
+export interface PurchaseOrderVO {
+  id: number; orderNo: string; supplierId: number; supplierName?: string
+  orderDate: string; expectedDelivery?: string; totalAmount?: number
+  currency?: string; paymentTerms?: string; status: string
+  items: PurchaseOrderItemVO[]; createdAt?: string; updatedAt?: string
+}
+export function listPurchaseOrders(params: PurchaseOrderQuery) { return get<PageResult<PurchaseOrderVO>>('/purchase-orders', params) }
+export function getPurchaseOrder(id: number) { return get<PurchaseOrderVO>('/purchase-orders/' + id) }
+export function deletePurchaseOrder(id: number) { return del<void>('/purchase-orders/' + id) }

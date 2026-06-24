@@ -7,6 +7,8 @@ import com.erp.order.dto.*;
 import com.erp.order.entity.*;
 import com.erp.order.mapper.*;
 import com.erp.order.service.OrdPurchaseOrderService;
+import com.erp.customer.mapper.CustSupplierMapper;
+import com.erp.customer.entity.CustSupplier;
 import com.erp.order.service.impl.OrdSalesOrderServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,13 +20,20 @@ import java.math.BigDecimal;
 public class OrdPurchaseOrderServiceImpl implements OrdPurchaseOrderService {
     final OrdPurchaseOrderMapper orderMapper;
     final OrdPurchaseOrderItemMapper itemMapper;
+    final CustSupplierMapper supplierMapper;
     final OrdSalesOrderServiceImpl salesOrderService; // 复用时注入
 
     PurchaseOrderVO toVO(OrdPurchaseOrder o) {
         var items = itemMapper.selectList(new LambdaQueryWrapper<OrdPurchaseOrderItem>()
                 .eq(OrdPurchaseOrderItem::getOrderId, o.getId()).orderByAsc(OrdPurchaseOrderItem::getLineNo));
+        // 查询供应商名称
+        String supName = null;
+        if (o.getSupplierId() != null) {
+            var sup = supplierMapper.selectById(o.getSupplierId());
+            if (sup != null) supName = sup.getSupplierName();
+        }
         return PurchaseOrderVO.builder().id(o.getId()).orderNo(o.getOrderNo())
-            .supplierId(o.getSupplierId()).relatedSalesOrderId(o.getRelatedSalesOrderId())
+            .supplierId(o.getSupplierId()).supplierName(supName).relatedSalesOrderId(o.getRelatedSalesOrderId())
             .orderDate(o.getOrderDate()).expectedDelivery(o.getExpectedDelivery())
             .totalAmount(o.getTotalAmount()).currency(o.getCurrency())
             .paymentTerms(o.getPaymentTerms()).remarks(o.getRemarks()).status(o.getStatus())
