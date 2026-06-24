@@ -471,3 +471,51 @@ Migrating schema `xxx` to version "1 - ..."
 - `yum-config-manager` 在最小化 CentOS 7 上不存在，要装 `yum-utils`（或者直接 sed/手写 repo 文件）
 
 **入坑日期**：2026-06-24（B1.2 阶段）
+
+## §15 — CentOS 7 minimal 缺 fontconfig，java.awt.Font 抛 NPE 导致验证码生成失败
+
+**症状**：CaptchaService 调 `Graphics2D.drawString()` 渲染 PNG，单测 `CaptchaServiceTest.generate_*` 抛 `java.lang.InternalError: java.lang.reflect.InvocationTargetException` → root cause：
+```
+Caused by: java.lang.NullPointerException: Cannot load from short array because "sun.awt.FontConfiguration.head" is null
+  at java.desktop/sun.awt.FontConfiguration.getVersion(...)
+  at java.desktop/sun.awt.X11FontManager.createFontConfiguration(...)
+```
+
+**根因**：JDK17 的 `sun.awt.X11FontManager` 启动时调用 `fc-list`/`fc-match` 读 fontconfig 配置；CentOS 7 minimal 镜像没装 `fontconfig` 和任何 ttf 字体，`FontConfiguration.head` 是 null。
+
+**修复**（在测试/生产服务器都得跑）：
+```bash
+yum install -y fontconfig dejavu-sans-fonts dejavu-serif-fonts
+fc-list | head   # 验证：≥ 1 行
+```
+
+**避坑替代方案**（如果不能装系统包）：
+1. 让 JDK 跑 headless：`-Djava.awt.headless=true`（启动参数）—— 但 X11FontManager 仍需要 fontconfig
+2. 改用第三方验证码库（Hutool/Kaptcha），它们用自己打包的 TTF 不依赖系统字体 —— 但拖入依赖
+3. 用 PIL/wkhtmltopdf 等外部工具生成 —— 不推荐
+
+**入坑日期**：2026-06-24（B1.4 Phase 2，CentOS 7 + JDK 17 + 纯 java.awt Captcha）
+
+---
+
+## §16 — Claude Code sandbox 拒 mvn/curl 时如何让它把活干完
+
+**症状**：派 Claude Code 跑后台开发任务，它写完代码后想自己跑 `mvn test` 验收，但 `--permission-mode acceptEdits` 不自动允许 shell 命令，最终 TASK_REPORT 里写"未跑成 mvn / curl"，把验收锅甩回给我。
+
+**修复**（下次派 Claude 前预热 `.claude/settings.json`）：
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn:*)",
+      "Bash(curl:*)",
+      "Bash(ssh:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)"
+    ]
+  }
+}
+```
+放在 `/code/demo2/.claude/settings.json`（项目级），下次 `claude -p ...` 会自动允许这些命令。**禁用清单**保持空，让 Claude 不能写 git commit/push 之类的不可逆动作（我自己来做）。
+
+**入坑日期**：2026-06-24（B1.4 Phase 2）

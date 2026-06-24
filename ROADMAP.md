@@ -90,7 +90,7 @@
 
 ---
 
-### 🟢 B1. Phase 1 — 基础设施（第 1-4 周）进行中 ~ 90%
+### 🟢 B1. Phase 1 — 基础设施（第 1-4 周）进行中 ~ 95%
 
 > **目标**：用户能登录系统、看到侧边栏菜单
 > **里程碑**：登录 → 拿 JWT → 调 `/auth/me` → 进入仪表盘
@@ -129,7 +129,7 @@
 - [x] vue-i18n 9（zh-CN / en-US，浏览器语言探测 + localStorage 持久化）
 - [x] vite dev 启动验证 OK（http://localhost:3000）
 
-#### 🟢 B1.4 erp-security + 认证（第 2-3 周）Phase 1 完成 ~ 50%
+#### ✅ B1.4 erp-security + 认证（第 2-3 周）Phase 1+2 完成 ✅ 2026-06-24
 
 **Phase 1 — 最小可用认证 ✅ 2026-06-24（commit 56d4f86，Claude 协作 + 我修依赖）**
 - [x] `JwtTokenProvider` 生成 Access(30min) + Refresh(30day) Token（jjwt 0.12.x 新 API）
@@ -255,7 +255,7 @@
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
-**全局进度**：现状盘点 100% / 实际开发 ≈ 22%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1 ✅ / 共 11 commits 56 测试通过 + Flyway 已落地）
+**全局进度**：现状盘点 100% / 实际开发 ≈ 28%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / 共 12 commits 72 测试通过 + Flyway + 验证码/refresh/改密 闭环）
 
 ---
 
@@ -301,4 +301,5 @@
 | 2026-06-24 | B1.3 完成（前端基建 pnpm/axios/i18n/JWT store/主题），commit cb37982 | 实施 |
 | 2026-06-24 | B1.4 Phase 1 完成（erp-security JWT 最小认证 + 11 单测），commit 56d4f86 | 实施 + Claude 协作 |
 | 2026-06-24 | B1.2 完成（MySQL 8 + Redis 7 yum 装、Flyway V1 6 表 + admin seed、starter-jdbc 修复、端到端登录 OK） | 实施 |
+| 2026-06-24 | B1.4 Phase 2 完成（change-password / refresh / captcha + 16 单测 + 8 段 e2e 验证全绿，fontconfig 修复） | 实施 + Claude 协作 |
 | 2026-06-24 | PITFALLS 追加 §12（erp-security 缺 starter-web）| 实施 |

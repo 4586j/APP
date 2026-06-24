@@ -37,6 +37,11 @@ app:
       secret: "change-me-in-prod-this-must-be-at-least-256-bit-key-padding-XXXXXXXX"
       access-token-expire-minutes: 30
       refresh-token-expire-days: 30
+    captcha:
+      # dev 默认关；联调走完整流程时临时改为 true（注意当前是 dev profile）
+      enabled: false
+      ttl-minutes: 5
+      length: 4
 
 logging:
   level:

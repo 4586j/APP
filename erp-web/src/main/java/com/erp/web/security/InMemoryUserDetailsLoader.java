@@ -78,4 +78,18 @@ public class InMemoryUserDetailsLoader implements UserDetailsLoader {
         }
         return u;
     }
+
+    /**
+     * 直接更新内存里的密码（B1.4 Phase 2）。
+     * 参数已是 BCrypt 加密串，AuthService 负责加密。
+     */
+    @Override
+    public void updatePassword(String username, String encryptedPassword) {
+        LoginUser u = users.get(username);
+        if (u == null) {
+            throw new UsernameNotFoundException("user not found: " + username);
+        }
+        u.setEncryptedPassword(encryptedPassword);
+        log.info("InMemory 用户 {} 密码已更新", username);
+    }
 }

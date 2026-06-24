@@ -21,4 +21,16 @@ public interface UserDetailsLoader {
      * @throws UsernameNotFoundException 用户不存在
      */
     LoginUser loadByUsername(String username) throws UsernameNotFoundException;
+
+    /**
+     * 更新指定用户的密码（B1.4 Phase 2）。
+     *
+     * <p>{@code encryptedPassword} 必须是已 BCrypt 加密后的串，由调用方负责加密。
+     * 默认抛 {@link UnsupportedOperationException}：开发期 InMemoryUserDetailsLoader 重写之；
+     * MySQL 实现（B1.5 erp-user 模块）后再覆盖即可。
+     */
+    default void updatePassword(String username, String encryptedPassword) {
+        throw new UnsupportedOperationException(
+                "当前 UserDetailsLoader 实现未支持 updatePassword：" + getClass().getName());
+    }
 }
