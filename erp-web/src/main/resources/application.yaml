@@ -1,6 +1,29 @@
+server:
+  port: 8081
+  servlet:
+    context-path: /
+
 spring:
   profiles:
     active: dev
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/erp_demo2?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: erp
+    password: Erp@App2026!
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: ErpHikariPool
+      minimum-idle: 2
+      maximum-pool-size: 10
+      idle-timeout: 600000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    encoding: UTF-8
   data:
     redis:
       host: localhost
@@ -18,3 +41,4 @@ app:
 logging:
   level:
     com.erp: DEBUG
+    org.flywaydb: INFO

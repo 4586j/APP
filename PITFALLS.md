@@ -424,3 +424,50 @@ SecurityConfig.java:[63,34] JwtAuthenticationFilter cannot be converted to jakar
    `mvn compile` 兜底；它在 TASK_REPORT 里说"预期通过"≠ 实际通过
 3. dependencyManagement 在父 pom 锁了版本，子模块加依赖**不需要写 version**，但**必须显式加**
 
+## §13 — Flyway 不自带 DataSource starter，必须显式引 spring-boot-starter-jdbc
+
+**症状**：erp-web/pom.xml 已引 `flyway-core` + `flyway-mysql` + `mysql-connector-j`，Spring Boot 启动时 Flyway 自动配置不生效，`@EnableAutoConfiguration` 报告 `FlywayAutoConfiguration` 因 `@ConditionalOnBean(DataSource.class)` 而跳过 —— 但项目根本没引 DataSource starter。
+
+**根因**：
+- `flyway-core` 只是迁移引擎，不是 Spring Boot starter
+- `mysql-connector-j` 只是 JDBC 驱动，不创建 DataSource bean
+- `spring-boot-autoconfigure` 里的 `DataSourceAutoConfiguration` 需要 `spring-boot-starter-jdbc` 把 HikariCP 和 `JdbcTemplate` 拉进来才会激活
+
+**修复**：erp-web/pom.xml 显式加：
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+```
+
+**验证方式**：启动日志里看到这两段同时出现才算齐了：
+```
+HikariPool-1 - Start completed.
+Flyway Community Edition X.Y.Z by Redgate
+Migrating schema `xxx` to version "1 - ..."
+```
+
+**对比**：如果项目用 `spring-boot-starter-data-jpa`，它已经传递依赖 `spring-boot-starter-jdbc`，所以 JPA 项目里不会踩这个坑；纯 MyBatis-Plus 或纯 Flyway 项目必须显式声明。
+
+**入坑日期**：2026-06-24（B1.2 阶段，CentOS 7 + MySQL 8.0.46 + Spring Boot 3.3.5）
+
+---
+
+## §14 — CentOS 7 装 MySQL 8 / Redis 7 的国内镜像可行通路
+
+**症状**：tuna / aliyun / huawei / ustc 的 mysql/yum 路径全部 404；epel 默认 redis 是 3.2.12（过老）。
+
+**可行通路**（2026-06 实测）：
+1. **MySQL 8**：直接走官方 `https://repo.mysql.com/mysql80-community-release-el7-11.noarch.rpm` 装 repo rpm，再 `yum install mysql-community-server`。官方源在国内速度可接受。
+2. **Redis 7**：用 SJTU 镜像的 remi 源：
+   ```
+   baseurl=https://mirror.sjtu.edu.cn/remi/enterprise/7/remi/$basearch/
+   ```
+   然后 `yum --enablerepo=remi,epel,base,updates,extras install -y redis-7.2.5`（必须把所有依赖源同时打开，remi 的 redis 依赖 base/epel 里的库）。
+
+**踩雷**：
+- `remi-release.rpm` 装完默认 `[remi]` 仓库 baseurl 指向法国主仓库，国内极慢，手写 `/etc/yum.repos.d/remi.repo` 用镜像覆盖
+- `yum-config-manager` 在最小化 CentOS 7 上不存在，要装 `yum-utils`（或者直接 sed/手写 repo 文件）
+
+**入坑日期**：2026-06-24（B1.2 阶段）

@@ -90,7 +90,7 @@
 
 ---
 
-### 🟢 B1. Phase 1 — 基础设施（第 1-4 周）进行中 ~ 80%
+### 🟢 B1. Phase 1 — 基础设施（第 1-4 周）进行中 ~ 90%
 
 > **目标**：用户能登录系统、看到侧边栏菜单
 > **里程碑**：登录 → 拿 JWT → 调 `/auth/me` → 进入仪表盘
@@ -105,11 +105,16 @@
 - [x] 工具类：`DateUtils` / `StringUtils` / `IdGenerator` — commit 88d5914
 - [x] 单元测试：45 个 @Test 通过（DateUtils 8 / IdGenerator 4 / StringUtils 13 / Currency 5 / Department 4 / OrderStatus 11）
 
-#### B1.2 Flyway + 数据库（第 1 周）
-- [⬜] `V1__init_system_tables.sql`（部门/用户/角色/权限 6 张表，从 `guide/erp_schema.sql` 截取）
-- [⬜] 放在 `erp-web/src/main/resources/db/migration/`
-- [⬜] `application.yml` 启用 Flyway
-- [⬜] 启动验证 6 张系统表自动创建
+#### ✅ B1.2 Flyway + 数据库 ✅ 2026-06-24
+- [x] MySQL 8.0.46 yum 安装（repo.mysql.com 官方源，CentOS 7）+ 应用账号 `erp/erp_demo2`
+- [x] Redis 7.2.5 安装（remi SJTU 镜像）+ ping=PONG
+- [x] `V1__init_system_tables.sql`（部门/用户/角色/权限 6 张表 + admin/ROLE_ADMIN seed，143 行）
+- [x] 放在 `erp-web/src/main/resources/db/migration/`
+- [x] `erp-web/pom.xml` 加 `spring-boot-starter-jdbc`（Flyway 不传递 DataSource starter，PITFALLS §13）
+- [x] `application.yaml` 接 DataSource + Hikari + Flyway + server.port=8081（避让 nginx）
+- [x] **真实启动 + Flyway 迁移成功**：`Started ErpApplication in 2.61s`，flyway_schema_history v1=success
+- [x] 端到端登录验证：`POST /api/v1/auth/login` 返 JWT，`/me` 携带 token 200，错密码 401
+- [x] 还原 ErpApplicationTests（去 B0.3 临时 exclude），`mvn -B test` 全模块 56/56 通过
 
 #### ✅ B1.3 前端初始化补齐 ✅ 2026-06-24
 - [x] 包管理切到 pnpm 9（npmmirror 镜像，pnpm-lock.yaml 64KB） — commit cb37982
@@ -250,7 +255,7 @@
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
-**全局进度**：现状盘点 100% / 实际开发 ≈ 18%（B0 ✅ / B1.1 ✅ / B1.3 ✅ / B1.4 Phase 1 ✅ / 共 10 commits 56 测试通过）
+**全局进度**：现状盘点 100% / 实际开发 ≈ 22%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1 ✅ / 共 11 commits 56 测试通过 + Flyway 已落地）
 
 ---
 
@@ -295,4 +300,5 @@
 | 2026-06-24 | B1.1 完成（erp-common 9 类 + 45 单测），commit 88d5914 + 2b13b2c | 实施 |
 | 2026-06-24 | B1.3 完成（前端基建 pnpm/axios/i18n/JWT store/主题），commit cb37982 | 实施 |
 | 2026-06-24 | B1.4 Phase 1 完成（erp-security JWT 最小认证 + 11 单测），commit 56d4f86 | 实施 + Claude 协作 |
+| 2026-06-24 | B1.2 完成（MySQL 8 + Redis 7 yum 装、Flyway V1 6 表 + admin seed、starter-jdbc 修复、端到端登录 OK） | 实施 |
 | 2026-06-24 | PITFALLS 追加 §12（erp-security 缺 starter-web）| 实施 |
