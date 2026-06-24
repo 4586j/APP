@@ -1,0 +1,48 @@
+// ============================================================
+// ERP 主题变量 — 仅 SCSS 层，不污染 Element Plus 内部变量
+// (Element Plus 主题覆盖通过 CSS var 在 global.scss 完成)
+// ============================================================
+
+// 品牌主色（外贸 ERP — 沉稳深蓝）
+$brand-primary: #1d4ed8;
+$brand-primary-light: #3b82f6;
+$brand-primary-dark: #1e3a8a;
+
+// 语义色
+$color-success: #16a34a;
+$color-warning: #f59e0b;
+$color-danger:  #dc2626;
+$color-info:    #64748b;
+
+// 中性色
+$color-text-primary:   #1f2937;
+$color-text-regular:   #4b5563;
+$color-text-secondary: #6b7280;
+$color-text-placeholder: #9ca3af;
+$color-border-light:   #e5e7eb;
+$color-border:         #d1d5db;
+$color-bg-page:        #f5f7fa;
+$color-bg-card:        #ffffff;
+
+// 布局
+$layout-header-height: 56px;
+$layout-sidebar-width: 220px;
+$layout-sidebar-collapsed-width: 64px;
+$layout-footer-height: 40px;
+
+// 圆角
+$radius-sm: 4px;
+$radius-md: 6px;
+$radius-lg: 8px;
+
+// 阴影
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+$shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+$shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+// z-index
+$z-dropdown: 1000;
+$z-sticky:   1020;
+$z-fixed:    1030;
+$z-modal:    2000;
+$z-message:  3000;
