@@ -178,11 +178,11 @@
 
 ---
 
-### ⬜ B2. Phase 2 — 产品与客户（第 5-8 周）
+### 🟡 B2. Phase 2 — 产品与客户（第 5-8 周）（进行中）
 
-- [⬜] erp-product：产品 CRUD / 分类树 / HS 编码 / 多币种价格
+- [✅] erp-product：产品 CRUD / 分类树 / HS 编码 / 多币种价格
 - [⬜] erp-customer：客户 + 供应商 CRUD（外贸特色字段：SWIFT/Tax ID/付款条款）
-- [⬜] 前端 `product/ProductList.vue` / `customer/CustomerList.vue` / `SupplierList.vue` 联调
+- [✅] 前端 `product/ProductList.vue` 联调完成（Customer/Supplier 待 B2.2）
 - [⬜] EasyExcel 批量导入/导出
 
 ---
@@ -258,7 +258,7 @@
 | **A 现有资产** | 4 | 4 | 0 | 0 | 100% |
 | **B0 初始化** | 4 | 3 | 1 | 0 | 75% |
 | **B1 基础设施** | 5 | 3 | 1 | 1 | 60% |
-| **B2 产品/客户** | 4 | 0 | 0 | 4 | 0% |
+| **B2 产品/客户** | 4 | 2 | 0 | 2 | 50% |
 | **B3 订单（核心）** | 6 | 0 | 0 | 6 | 0% |
 | **B4 财务/审批** | 5 | 0 | 0 | 5 | 0% |
 | **B5 物流/单证** | 6 | 0 | 0 | 6 | 0% |
@@ -266,7 +266,7 @@
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
-**全局进度**：现状盘点 100% / 实际开发 ≈ 39%（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / B1 前端登录 ✅ / **B1.5 erp-user 后端 ✅**（@ConditionalOnProperty 修复装配时序）/ 共 15 commits 71 测试通过 + Flyway V2 button 权限 + MysqlUserDetailsLoader 生产装配）
+**全局进度**：现状盘点 100% / 实际开发 ≈ 46%（B2.1 产品模块后端+前端完成）（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / B1 前端登录 ✅ / **B1.5 erp-user 后端 ✅**（@ConditionalOnProperty 修复装配时序）/ 共 15 commits 71 测试通过 + Flyway V2 button 权限 + MysqlUserDetailsLoader 生产装配）
 
 ---
 
