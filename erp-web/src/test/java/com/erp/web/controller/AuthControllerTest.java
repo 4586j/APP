@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class,FlywayAutoConfiguration.class,HibernateJpaAutoConfiguration.class,MybatisPlusAutoConfiguration.class})
 @ActiveProfiles("dev")
+@org.springframework.test.context.TestPropertySource(properties = "erp.user.persistence=memory")
 @SpringBootTest
 class AuthControllerTest {
     @Autowired MockMvc m;

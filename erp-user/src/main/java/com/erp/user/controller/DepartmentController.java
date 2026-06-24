@@ -15,7 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/system/departments")
 @RequiredArgsConstructor
-@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(javax.sql.DataSource.class)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class DepartmentController {
     private final DepartmentService departmentService;
     @GetMapping @PreAuthorize("hasAuthority('department:view')") public R<List<DepartmentTreeNode>> list() { return R.ok(departmentService.treeAll()); }

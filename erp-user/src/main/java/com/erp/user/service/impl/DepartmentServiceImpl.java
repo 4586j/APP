@@ -16,7 +16,7 @@ import java.util.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(javax.sql.DataSource.class)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class DepartmentServiceImpl implements DepartmentService {
     private final SysDepartmentMapper departmentMapper;
 

@@ -15,8 +15,8 @@ import java.util.Map;
 
 @Slf4j
 @Component
-@Profile("dev")
-@ConditionalOnMissingBean(javax.sql.DataSource.class)
+
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "memory")
 public class InMemoryUserDetailsLoader implements UserDetailsLoader {
     private final PasswordEncoder passwordEncoder;
     private final Map<String, LoginUser> users = new HashMap<>();

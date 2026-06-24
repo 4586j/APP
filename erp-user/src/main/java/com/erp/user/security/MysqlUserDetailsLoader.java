@@ -15,7 +15,7 @@ import java.util.List;
 @Slf4j
 @Component("mysqlUserDetailsLoader")
 @Primary
-@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(javax.sql.DataSource.class)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class MysqlUserDetailsLoader implements UserDetailsLoader {
     private final UserService userService;
     private final SysDepartmentMapper deptMapper;

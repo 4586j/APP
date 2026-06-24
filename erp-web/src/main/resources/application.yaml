@@ -47,3 +47,7 @@ logging:
   level:
     com.erp: DEBUG
     org.flywaydb: INFO
+
+erp:
+  user:
+    persistence: mysql  # mysql | memory

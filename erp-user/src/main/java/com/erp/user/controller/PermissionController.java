@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/system/permissions")
 @RequiredArgsConstructor
-@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(javax.sql.DataSource.class)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class PermissionController {
     private final PermissionService permissionService;
     @GetMapping("/tree") @PreAuthorize("hasAuthority('permission:view')") public R<List<PermissionTreeNode>> tree() { return R.ok(permissionService.treeAll()); }

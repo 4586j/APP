@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/system/roles")
 @RequiredArgsConstructor
-@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(javax.sql.DataSource.class)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class RoleController {
     private final RoleService roleService;
     @GetMapping @PreAuthorize("hasAuthority('role:view')") public R<List<RoleVO>> list() { return R.ok(roleService.listAll()); }

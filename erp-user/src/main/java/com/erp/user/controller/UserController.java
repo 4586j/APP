@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/system/users")
 @RequiredArgsConstructor
-@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(javax.sql.DataSource.class)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class UserController {
     private final UserService userService;
     @GetMapping @PreAuthorize("hasAuthority('user:view')") public R<?> page(UserQuery query) { return R.ok(userService.pageUsers(query)); }
