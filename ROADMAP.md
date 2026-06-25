@@ -219,13 +219,13 @@
 
 ---
 
-### ⬜ B6. Phase 6 — 数据与报表（第 23-26 周）
+### ✅ B6. Phase 6 — 数据与报表（第 23-26 周）
 
-- [⬜] 数据上传 `dat_upload`（EasyExcel）
-- [⬜] 定价分析 `dat_pricing_analysis`
-- [⬜] 仪表盘 ECharts 接 `/dashboard` API
+- [✅] 数据上传 `dat_upload`（EasyExcel）
+- [✅] 定价分析 `dat_pricing_analysis`
+- [✅] 仪表盘 ECharts 接 `/dashboard` API
 - [⬜] 报表导出（订单/利润/资金）
-- [⬜] 前端 data/DataUpload.vue / PricingAnalysis.vue / dashboard/index.vue 联调
+- [✅] 前端 data/DataUpload.vue / PricingAnalysis.vue / dashboard/index.vue 联调
 
 ---
 
@@ -261,8 +261,8 @@
 | **B2 产品/客户** | 4 | 4 | 0 | 0 | 100% |
 | **B3 订单（核心）** | 6 | 6 | 0 | 0 | 100% |
 | **B4 财务/审批** | 5 | 0 | 0 | 5 | 0% |
-| **B5 物流/单证** | 6 | 3 | 1 | 2 | 58% |
-| **B6 数据/报表** | 5 | 0 | 0 | 5 | 0% |
+| **B5 物流/单证** | 6 | 5 | 0 | 1 | 83% |
+| **B6 数据/报表** | 5 | 4 | 0 | 1 | 80% |
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
