@@ -17,7 +17,7 @@
       <el-dropdown trigger="click" @command="handleCommand">
         <div class="user-info">
           <el-avatar :size="32" icon="UserFilled" />
-          <span class="username">张三</span>
+          <span class="username">{{ displayName }}</span>
           <el-icon><ArrowDown /></el-icon>
         </div>
         <template #dropdown>
@@ -41,20 +41,25 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '@/store/user'
 
 defineProps<{ collapsed: boolean }>()
 defineEmits<{ toggle: [] }>()
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const currentTitle = computed(() => {
   const matched = route.matched
   return matched.length > 0 ? matched[matched.length - 1].meta?.title as string : ''
 })
 
-function handleCommand(cmd: string) {
+const displayName = computed(() => userStore.userInfo?.realName || userStore.userInfo?.username || '用户')
+
+async function handleCommand(cmd: string) {
   if (cmd === 'logout') {
+    await userStore.logout()
     router.push('/login')
   }
 }

@@ -86,10 +86,13 @@ const menuItems: MenuItem[] = [
     ],
   },
   { path: '/approval', title: '审批中心', icon: 'Stamp', permission: 'approval:view' },
+  { path: '/report', title: '工作报表', icon: 'Memo', permission: 'work:report:manage' },
   {
     path: '/system', title: '系统管理', icon: 'Setting', permission: 'system', children: [
       { path: '/system/user', title: '用户管理', permission: 'system:user' },
       { path: '/system/role', title: '角色管理', permission: 'system:role' },
+      { path: '/system/department', title: '部门管理', permission: 'system:dept' },
+      { path: '/system/permission', title: '权限管理', permission: 'system:perm' },
     ],
   },
 ]

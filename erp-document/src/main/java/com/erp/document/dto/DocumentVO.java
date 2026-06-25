@@ -5,5 +5,6 @@ import java.time.LocalDateTime;
 public class DocumentVO {
     Long id; String docNo; String docType; Long orderId; String orderNo; Long shipmentId;
     String title; String status; String templateCode; String filePath; String fileName; Long fileSize;
+    String minioObjectKey; String contentType;
     Long generatedBy; LocalDateTime generatedAt; String remark; LocalDateTime createdAt;
 }

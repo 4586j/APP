@@ -24,4 +24,5 @@ public class UserVO {
     private LocalDateTime createdAt;
     private List<String> roleCodes;
     private List<String> permCodes;
+    private List<Long> roleIds;
 }

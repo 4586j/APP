@@ -1,5 +1,6 @@
 package com.erp.user.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.erp.common.dto.BatchImportResult;
 import com.erp.user.dto.*;
 import com.erp.user.entity.SysUser;
 import java.util.List;
@@ -20,4 +21,14 @@ public interface UserService {
     void updatePassword(String username, String encryptedPassword);
     void recordLoginSuccess(String username, String ip);
     int recordLoginFailure(String username);
+
+    /**
+     * 批量创建用户。
+     */
+    BatchImportResult batchCreateUsers(List<UserCreateRequest> list);
+
+    /**
+     * 从 Excel 导入用户。
+     */
+    BatchImportResult importUsersFromExcel(java.io.InputStream inputStream);
 }

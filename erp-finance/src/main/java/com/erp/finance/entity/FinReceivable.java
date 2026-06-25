@@ -9,5 +9,6 @@ public class FinReceivable {
     BigDecimal totalAmount; BigDecimal receivedAmount;
     LocalDate dueDate; String currency="CNY"; String status="pending"; String remark;
     Integer deleted=0;
+    @Version Integer version;
     LocalDateTime createdAt; LocalDateTime updatedAt;
 }

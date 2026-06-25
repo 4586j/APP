@@ -7,6 +7,7 @@ public class DocDocument {
     Long orderId; String orderNo; Long shipmentId; String title;
     String status="draft"; String templateCode;
     String filePath; String fileName; Long fileSize;
+    String minioObjectKey; String contentType;
     Long generatedBy; LocalDateTime generatedAt; String remark;
     Integer deleted=0; LocalDateTime createdAt; LocalDateTime updatedAt;
 }

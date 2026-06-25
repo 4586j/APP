@@ -16,7 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -113,6 +117,34 @@ public class DatUploadServiceImpl implements DatUploadService {
             .set(DatUpload::getDeleted, 1));
         if (updated == 0) {
             throw new BusinessException(R.CODE_NOT_FOUND, "upload not found");
+        }
+    }
+
+    @Override
+    public void download(Long id, HttpServletResponse response) {
+        DatUpload e = mapper.selectById(id);
+        if (e == null || e.getDeleted() == 1) {
+            throw new BusinessException(R.CODE_NOT_FOUND, "upload not found");
+        }
+        if (e.getFilePath() == null || e.getFilePath().isEmpty()) {
+            throw new BusinessException(R.CODE_PARAM_INVALID, "file path not set");
+        }
+        Path file = Path.of(e.getFilePath());
+        if (!Files.exists(file)) {
+            throw new BusinessException(R.CODE_NOT_FOUND, "file not found on disk");
+        }
+        try {
+            String encodedName = URLEncoder.encode(e.getFileName(), StandardCharsets.UTF_8)
+                .replaceAll("\\+", "%20");
+            response.setContentType("application/octet-stream");
+            response.setHeader("Content-Disposition", "attachment; filename*=utf-8''" + encodedName);
+            response.setContentLengthLong(Files.size(file));
+            try (InputStream in = Files.newInputStream(file)) {
+                in.transferTo(response.getOutputStream());
+            }
+            response.flushBuffer();
+        } catch (IOException ex) {
+            throw new IllegalStateException("file download failed", ex);
         }
     }
 

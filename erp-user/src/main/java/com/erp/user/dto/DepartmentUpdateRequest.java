@@ -9,4 +9,5 @@ public class DepartmentUpdateRequest {
     private String code;
     private Long parentId;
     private Integer sortOrder;
+    private Integer status;
 }

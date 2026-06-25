@@ -1,12 +1,20 @@
 package com.erp.user.controller;
+import com.erp.common.dto.BatchImportResult;
 import com.erp.common.model.R;
 import com.erp.user.dto.*;
 import com.erp.user.service.UserService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -24,4 +32,29 @@ public class UserController {
     @PutMapping("/{id}/unlock") @PreAuthorize("hasAuthority('user:update')") public R<Void> unlock(@PathVariable Long id) { userService.unlockUser(id); return R.ok(); }
     @PutMapping("/{id}/reset-password") @PreAuthorize("hasAuthority('user:update')") public R<Void> resetPassword(@PathVariable Long id, @Valid @RequestBody ResetPasswordRequest req) { userService.resetPassword(id, req.getNewPassword()); return R.ok(); }
     @PutMapping("/{id}/roles") @PreAuthorize("hasAuthority('user:assign-role')") public R<Void> assignRoles(@PathVariable Long id, @Valid @RequestBody AssignRolesRequest req) { userService.assignRoles(id, req.getRoleIds()); return R.ok(); }
+
+    @PostMapping("/batch")
+    @PreAuthorize("hasAuthority('user:create')")
+    public R<BatchImportResult> batchCreate(@Valid @RequestBody List<UserCreateRequest> list) {
+        return R.ok(userService.batchCreateUsers(list));
+    }
+
+    @PostMapping(value = "/import", consumes = "multipart/form-data")
+    @PreAuthorize("hasAuthority('user:create')")
+    public R<BatchImportResult> importExcel(@RequestParam("file") MultipartFile file) throws IOException {
+        return R.ok(userService.importUsersFromExcel(file.getInputStream()));
+    }
+
+    @GetMapping("/import-template")
+    @PreAuthorize("hasAuthority('user:view')")
+    public void downloadTemplate(HttpServletResponse response) throws IOException {
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setCharacterEncoding("utf-8");
+        String fileName = URLEncoder.encode("用户导入模板", StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+        response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
+
+        com.alibaba.excel.EasyExcel.write(response.getOutputStream(), UserImportExcelDTO.class)
+                .sheet("用户模板")
+                .doWrite(List.of());
+    }
 }

@@ -8,8 +8,10 @@ import com.erp.user.dto.RoleUpdateRequest;
 import com.erp.user.dto.RoleVO;
 import com.erp.user.entity.SysRole;
 import com.erp.user.entity.SysRolePermission;
+import com.erp.user.entity.SysUserRole;
 import com.erp.user.mapper.SysRoleMapper;
 import com.erp.user.mapper.SysRolePermissionMapper;
+import com.erp.user.mapper.SysUserRoleMapper;
 import com.erp.user.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
 public class RoleServiceImpl implements RoleService {
     private final SysRoleMapper roleMapper;
     private final SysRolePermissionMapper rolePermissionMapper;
+    private final SysUserRoleMapper userRoleMapper;
 
     @Override
     public List<RoleVO> listAll() {
@@ -102,6 +105,24 @@ public class RoleServiceImpl implements RoleService {
         }
         roleMapper.deleteById(id);
         rolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, id));
+        userRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, id));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignUsers(Long roleId, List<Long> userIds) {
+        if (roleMapper.selectById(roleId) == null) {
+            throw new BusinessException(R.CODE_NOT_FOUND, "role not found");
+        }
+        userRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, roleId));
+        if (userIds != null && !userIds.isEmpty()) {
+            for (Long uid : userIds) {
+                SysUserRole ur = new SysUserRole();
+                ur.setRoleId(roleId);
+                ur.setUserId(uid);
+                userRoleMapper.insert(ur);
+            }
+        }
     }
 
     @Override

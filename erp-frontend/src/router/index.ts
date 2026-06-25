@@ -16,7 +16,7 @@ const routes: RouteRecordRaw[] = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '仪表盘', icon: 'Odometer' },
+        meta: { title: '工作台', icon: 'Odometer' },
       },
       {
         path: 'order',
@@ -135,6 +135,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '审批中心', icon: 'Stamp' },
       },
       {
+        path: 'report',
+        name: 'WorkReport',
+        component: () => import('@/views/report/WorkReportManage.vue'),
+        meta: { title: '工作报表', icon: 'Memo' },
+      },
+      {
         path: 'system',
         name: 'System',
         redirect: '/system/user',
@@ -151,6 +157,18 @@ const routes: RouteRecordRaw[] = [
             name: 'RoleManage',
             component: () => import('@/views/system/RoleManage.vue'),
             meta: { title: '角色管理' },
+          },
+          {
+            path: 'department',
+            name: 'DepartmentManage',
+            component: () => import('@/views/system/DepartmentManage.vue'),
+            meta: { title: '部门管理' },
+          },
+          {
+            path: 'permission',
+            name: 'PermissionManage',
+            component: () => import('@/views/system/PermissionManage.vue'),
+            meta: { title: '权限管理' },
           },
         ],
       },

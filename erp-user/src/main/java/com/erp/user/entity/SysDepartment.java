@@ -22,4 +22,5 @@ public class SysDepartment extends BaseEntity {
 
     private String deptPath;
     private Integer sortOrder;
+    private Integer status;
 }

@@ -5,5 +5,7 @@ import java.math.BigDecimal; import java.time.LocalDateTime;
 public class FundApprovalVO {
     Long id; String requestNo; String title; String fundType;
     BigDecimal amount; String currency; Long supplierId; String supplierName;
-    String description; String status; Long applicant; LocalDateTime createdAt;
+    String description; String status; Long applicant;
+    String approverRole; Long approver; String approveComment;
+    LocalDateTime createdAt;
 }

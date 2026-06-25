@@ -9,4 +9,6 @@ public class FinExchangeRate {
     private BigDecimal rate; private LocalDate rateDate; private String source;
     @TableField(fill = FieldFill.INSERT) private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE) private LocalDateTime updatedAt;
+    @Version private Integer version;
+    @TableLogic private Integer deleted;
 }

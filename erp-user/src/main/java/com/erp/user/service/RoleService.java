@@ -9,4 +9,9 @@ public interface RoleService {
     void update(Long id, RoleUpdateRequest req);
     void delete(Long id);
     void assignPermissions(Long roleId, List<Long> permissionIds);
+
+    /**
+     * 为角色分配用户（覆盖式）。
+     */
+    void assignUsers(Long roleId, List<Long> userIds);
 }

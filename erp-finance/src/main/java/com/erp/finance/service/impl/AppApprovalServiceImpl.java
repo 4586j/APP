@@ -5,6 +5,7 @@ import com.erp.finance.dto.*;
 import com.erp.finance.entity.*;
 import com.erp.finance.mapper.*;
 import com.erp.finance.service.AppApprovalService;
+import com.erp.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ public class AppApprovalServiceImpl implements AppApprovalService {
     final AppApprovalHistoryMapper historyMapper;
     final AppWorkflowMapper workflowMapper;
     final AppWorkflowNodeMapper nodeMapper;
+    final NotificationService notificationService;
 
     @Override
     public AppApprovalPageVO listPage(AppApprovalRequestQuery q) {
@@ -97,6 +99,7 @@ public class AppApprovalServiceImpl implements AppApprovalService {
         var h = new AppApprovalHistory();
         h.setRequestId(id); h.setApprover(approver); h.setAction("approved"); h.setComment(comment);
         historyMapper.insert(h);
+        notifyApplicant(r, true, comment);
     }
 
     @Override
@@ -110,5 +113,20 @@ public class AppApprovalServiceImpl implements AppApprovalService {
         var h = new AppApprovalHistory();
         h.setRequestId(id); h.setApprover(approver); h.setAction("rejected"); h.setComment(comment);
         historyMapper.insert(h);
+        notifyApplicant(r, false, comment);
+    }
+
+    /** 审批通过/驳回后给申请人发站内通知。通知失败不影响审批主流程。 */
+    private void notifyApplicant(AppApprovalRequest r, boolean approved, String comment) {
+        if (r.getApplicant() == null) return;
+        try {
+            var result = approved ? "已通过" : "被驳回";
+            var title = "审批" + result + "：" + r.getTitle();
+            var sb = new StringBuilder("您提交的审批请求[").append(r.getRequestNo()).append("]").append(result).append("。");
+            if (comment != null && !comment.isBlank()) sb.append(" 审批意见：").append(comment);
+            notificationService.send(title, sb.toString(), "approval", "approval_request", r.getId(), r.getApplicant());
+        } catch (Exception e) {
+            // 通知是旁路功能，失败仅吞掉不回滚审批
+        }
     }
 }

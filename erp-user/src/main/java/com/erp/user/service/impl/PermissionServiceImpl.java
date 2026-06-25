@@ -6,7 +6,9 @@ import com.erp.user.dto.PermissionTreeNode;
 import com.erp.user.dto.PermissionUpdateRequest;
 import com.erp.user.dto.PermissionVO;
 import com.erp.user.entity.SysPermission;
+import com.erp.user.mapper.SysDepartmentPermissionMapper;
 import com.erp.user.mapper.SysPermissionMapper;
+import com.erp.user.mapper.SysRolePermissionMapper;
 import com.erp.user.service.PermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,8 @@ import java.util.stream.Collectors;
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class PermissionServiceImpl implements PermissionService {
     private final SysPermissionMapper permissionMapper;
+    private final SysRolePermissionMapper rolePermMapper;
+    private final SysDepartmentPermissionMapper deptPermMapper;
 
     @Override public List<PermissionTreeNode> treeAll() { return buildTree(permissionMapper.selectList(null)); }
     @Override public List<PermissionVO> listAll() {
@@ -71,5 +75,10 @@ public class PermissionServiceImpl implements PermissionService {
     @Override @Transactional(rollbackFor = Exception.class) public void delete(Long id) {
         if (permissionMapper.selectById(id) == null) throw new BusinessException(R.CODE_NOT_FOUND, "permission not found");
         permissionMapper.deleteById(id);
+        // 联动删除角色-权限、部门-权限关联
+        rolePermMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.erp.user.entity.SysRolePermission>()
+                .eq(com.erp.user.entity.SysRolePermission::getPermissionId, id));
+        deptPermMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.erp.user.entity.SysDepartmentPermission>()
+                .eq(com.erp.user.entity.SysDepartmentPermission::getPermissionId, id));
     }
 }

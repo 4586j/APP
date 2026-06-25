@@ -1,4 +1,5 @@
 import { get, post, put, del } from './request'
+import type { Id } from './system'
 
 /* ---- 数据上传 ---- */
 export interface DataUploadQuery {
@@ -39,7 +40,7 @@ export function getUpload(id: string) {
 }
 
 export function createUpload(fileName: string, fileType: string, fileSize?: number, department?: string) {
-  return post<number>('/data/uploads', null, {
+  return post<Id>('/data/uploads', null, {
     params: { fileName, fileType, fileSize, department },
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
   })
@@ -50,13 +51,35 @@ export function uploadDataFile(file: File, fileType: string, department?: string
   formData.append('file', file)
   formData.append('fileType', fileType)
   if (department) formData.append('department', department)
-  return post<number>('/data/uploads', formData, {
+  return post<Id>('/data/uploads', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
 
 export function deleteUpload(id: string) {
   return del<void>(`/data/uploads/${id}`)
+}
+
+export function downloadUpload(id: string) {
+  return get<Blob>(`/data/uploads/${id}/download`, undefined, { responseType: 'blob' })
+}
+
+/* ---- 定价分析批量导入 ---- */
+export interface BatchImportResult {
+  successCount: number
+  failList: { index: number; name: string; reason: string }[]
+}
+
+export function importPricingExcel(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return post<BatchImportResult>('/data/pricing/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+export function downloadPricingTemplate() {
+  return get<Blob>('/data/pricing/import-template', undefined, { responseType: 'blob' })
 }
 
 /* ---- 定价分析 ---- */
@@ -68,7 +91,7 @@ export interface PricingQuery {
 }
 
 export interface PricingCreateRequest {
-  productId: number
+  productId: Id
   title: string
   costPrice?: number
   targetPrice?: number
@@ -82,8 +105,8 @@ export interface PricingCreateRequest {
 }
 
 export interface PricingVO {
-  id: number
-  productId: number
+  id: Id
+  productId: Id
   title: string
   costPrice: number
   targetPrice: number
@@ -108,19 +131,19 @@ export function listPricings(params: PricingQuery) {
   return get<PricingPageVO>('/data/pricing', params)
 }
 
-export function getPricing(id: number) {
+export function getPricing(id: Id) {
   return get<PricingVO>(`/data/pricing/${id}`)
 }
 
 export function createPricing(data: PricingCreateRequest) {
-  return post<number>('/data/pricing', data)
+  return post<Id>('/data/pricing', data)
 }
 
-export function updatePricing(id: number, data: PricingCreateRequest) {
+export function updatePricing(id: Id, data: PricingCreateRequest) {
   return put<void>(`/data/pricing/${id}`, data)
 }
 
-export function deletePricing(id: number) {
+export function deletePricing(id: Id) {
   return del<void>(`/data/pricing/${id}`)
 }
 

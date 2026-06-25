@@ -33,3 +33,13 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Secrets & Runtime ###
+erp-web/src/main/resources/application.yaml
+uploads/
+*.bak
+*.tmp
+
+### OS ###
+.DS_Store
+Thumbs.db

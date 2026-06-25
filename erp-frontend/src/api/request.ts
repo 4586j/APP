@@ -10,12 +10,21 @@ const service: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json;charset=utf-8' },
 })
 
-// 请求拦截：注入 token + traceId
+// 请求拦截：注入 token + traceId，GET 禁用浏览器缓存
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = storage.get<string>(StorageKey.TOKEN)
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+    if (config.method?.toLowerCase() === 'get') {
+      if (config.params instanceof URLSearchParams) {
+        config.params.set('_t', Date.now().toString())
+      } else {
+        config.params = { ...(config.params || {}), _t: Date.now() }
+      }
+      config.headers['Cache-Control'] = 'no-cache'
+      config.headers.Pragma = 'no-cache'
     }
     config.headers['X-Trace-Id'] = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
     return config
@@ -30,9 +39,9 @@ service.interceptors.response.use(
   (response) => {
     const res = response.data as ApiResult
 
-    // 二进制流直接返回 raw
+    // 二进制流直接返回 raw data
     if (response.config.responseType === 'blob' || response.config.responseType === 'arraybuffer') {
-      return response
+      return response.data
     }
 
     if (res.code === BizCode.SUCCESS) {

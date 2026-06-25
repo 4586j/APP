@@ -9,7 +9,14 @@ public class FinFundApproval {
     private String fundType; private BigDecimal amount; private String currency;
     private Long supplierId; private String description;
     private String status; private Long applicant;
+    /** 按金额阈值自动分配的审批角色 */
+    private String approverRole;
+    /** 实际审批人ID */
+    private Long approver;
+    /** 审批备注 */
+    private String approveComment;
     @TableField(fill = FieldFill.INSERT) private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE) private LocalDateTime updatedAt;
+    @Version private Integer version;
     @TableLogic private Integer deleted;
 }

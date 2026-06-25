@@ -8,6 +8,7 @@ import com.erp.finance.service.FinExchangeRateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDate;
 @Service @RequiredArgsConstructor
 public class FinExchangeRateServiceImpl implements FinExchangeRateService {
     final FinExchangeRateMapper rateMapper;
@@ -30,4 +31,19 @@ public class FinExchangeRateServiceImpl implements FinExchangeRateService {
         rateMapper.insert(e); return e.getId();
     }
     @Transactional public void delete(Long id){rateMapper.deleteById(id);}
+
+    @Override public ExchangeRateVO getCurrent(String from, String to){
+        var w = new LambdaQueryWrapper<FinExchangeRate>()
+            .eq(FinExchangeRate::getCurrencyFrom, from)
+            .eq(FinExchangeRate::getCurrencyTo, to)
+            .le(FinExchangeRate::getRateDate, LocalDate.now())
+            .orderByDesc(FinExchangeRate::getRateDate)
+            .orderByDesc(FinExchangeRate::getCreatedAt)
+            .last("LIMIT 1");
+        var r = rateMapper.selectOne(w);
+        if (r == null) return null;
+        return ExchangeRateVO.builder().id(r.getId()).currencyFrom(r.getCurrencyFrom())
+            .currencyTo(r.getCurrencyTo()).rate(r.getRate()).rateDate(r.getRateDate())
+            .source(r.getSource()).createdAt(r.getCreatedAt()).build();
+    }
 }

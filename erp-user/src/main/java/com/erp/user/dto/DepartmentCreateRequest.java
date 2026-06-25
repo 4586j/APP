@@ -13,4 +13,5 @@ public class DepartmentCreateRequest {
     @Size(max = 64, message = "部门名称长度不能超过 64")
     private String name;
     private Integer sortOrder = 0;
+    private Integer status = 1;
 }

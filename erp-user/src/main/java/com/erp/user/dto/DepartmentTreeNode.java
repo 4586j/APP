@@ -11,5 +11,6 @@ public class DepartmentTreeNode {
     private String name;
     private String deptPath;
     private Integer sortOrder;
+    private Integer status;
     private List<DepartmentTreeNode> children = new ArrayList<>();
 }

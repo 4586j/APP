@@ -35,8 +35,17 @@
         <el-table-column prop="department" label="共享部门" width="160" />
         <el-table-column prop="createdBy" label="上传人" width="90" />
         <el-table-column prop="createdAt" label="上传时间" width="180" />
-        <el-table-column label="操作" width="100" align="center">
+        <el-table-column label="操作" width="160" align="center">
           <template #default="{ row }">
+            <el-button
+              v-if="hasPerm('data:upload:download')"
+              type="primary"
+              link
+              size="small"
+              @click="doDownload(row as any)"
+            >
+              下载
+            </el-button>
             <el-popconfirm title="确定逻辑删除该上传记录？" @confirm="doDelete(row.id)">
               <template #reference>
                 <el-button type="danger" link size="small">删除</el-button>
@@ -104,7 +113,11 @@
 import { reactive, ref, onMounted } from 'vue'
 import { Search, Upload, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, type UploadFile, type UploadInstance, type UploadRawFile } from 'element-plus'
-import { listUploads, uploadDataFile, deleteUpload, type DataUploadVO } from '@/api/data'
+import { listUploads, uploadDataFile, deleteUpload, downloadUpload, type DataUploadVO } from '@/api/data'
+import { useUserStore } from '@/store/user'
+
+const userStore = useUserStore()
+const hasPerm = (perm: string) => userStore.hasPermission(perm)
 
 const loading = ref(false)
 const uploading = ref(false)
@@ -178,6 +191,23 @@ async function doUpload() {
     console.error('Upload failed:', e)
   } finally {
     uploading.value = false
+  }
+}
+
+async function doDownload(row: DataUploadVO) {
+  try {
+    const blob = await downloadUpload(row.id)
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = row.fileName || 'download'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  } catch (e: any) {
+    console.error('Download failed:', e)
+    ElMessage.error(e?.message || '下载失败')
   }
 }
 
