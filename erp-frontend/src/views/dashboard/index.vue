@@ -65,15 +65,105 @@
 <script setup lang="ts">
 type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 import { ref, onMounted } from 'vue'
+import { getDashboardStats, type DashboardStatsVO } from '@/api/data'
 
 const today = new Date().toLocaleDateString('zh-CN')
+const stats = ref<DashboardStatsVO | null>(null)
 
-const statCards = [
-  { label: '今日订单数', value: '28', icon: 'Document', color: '#2563eb' },
-  { label: '本月销售额 (USD)', value: '$ 486,200', icon: 'Money', color: '#10b981' },
-  { label: '待审批事项', value: '12', icon: 'Stamp', color: '#f59e0b' },
-  { label: '本月利润 (RMB)', value: '¥ 326,800', icon: 'TrendCharts', color: '#8b5cf6' },
-]
+const statCards = ref([
+  { label: '客户数', value: '-', icon: 'User', color: '#2563eb' },
+  { label: '产品数', value: '-', icon: 'Goods', color: '#10b981' },
+  { label: '总订单数', value: '-', icon: 'Document', color: '#f59e0b' },
+  { label: '本月利润 (USD)', value: '-', icon: 'TrendCharts', color: '#8b5cf6' },
+])
+
+onMounted(async () => {
+  try {
+    const s = await getDashboardStats()
+    stats.value = s
+    statCards.value = [
+      { label: '客户数', value: String(s.customerCount), icon: 'User', color: '#2563eb' },
+      { label: '产品数', value: String(s.productCount), icon: 'Goods', color: '#10b981' },
+      { label: '总订单数', value: String(s.orderCount), icon: 'Document', color: '#f59e0b' },
+      { label: '本月利润 (USD)', value: `$ ${s.monthlyProfit.toLocaleString()}`, icon: 'TrendCharts', color: '#8b5cf6' },
+    ]
+    // 图表
+    await renderCharts(s)
+  } catch (e) {
+    console.error('Dashboard load failed:', e)
+  }
+})
+
+async function renderCharts(s: DashboardStatsVO) {
+  try {
+    const echarts = await import('echarts')
+
+    if (trendChartRef.value) {
+      const chart = echarts.init(trendChartRef.value)
+      chart.setOption({
+        tooltip: { trigger: 'axis' },
+        grid: { left: 40, right: 20, top: 10, bottom: 24 },
+        xAxis: {
+          type: 'category',
+          data: s.trend.length ? s.trend.map(t => t.month) : [],
+          axisLine: { lineStyle: { color: '#e0e0e0' } },
+          axisLabel: { color: '#999', fontSize: 11 },
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { color: '#f0f0f0' } },
+          axisLabel: { color: '#999', fontSize: 11 },
+        },
+        series: [
+          {
+            name: '销售额',
+            type: 'bar',
+            data: s.trend.length ? s.trend.map(t => t.revenue) : [],
+            itemStyle: { borderRadius: [4, 4, 0, 0], color: '#2563eb' },
+            barWidth: 22,
+          },
+          {
+            name: '利润',
+            type: 'line',
+            data: s.trend.length ? s.trend.map(t => t.profit) : [],
+            smooth: true,
+            lineStyle: { color: '#10b981', width: 2 },
+            itemStyle: { color: '#10b981' },
+            symbol: 'circle',
+            symbolSize: 6,
+          },
+        ],
+      })
+    }
+
+    if (pieChartRef.value) {
+      const chart = echarts.init(pieChartRef.value)
+      chart.setOption({
+        tooltip: { trigger: 'item' },
+        legend: { bottom: 0, textStyle: { fontSize: 12 } },
+        series: [{
+          type: 'pie',
+          radius: ['55%', '78%'],
+          center: ['50%', '45%'],
+          label: { show: false },
+          data: s.orderStatusDist.length
+            ? s.orderStatusDist.map(d => ({ value: d.value, name: d.name, itemStyle: { color: pickColor(d.name) } }))
+            : [{ value: 1, name: '暂无数据', itemStyle: { color: '#e0e0e0' } }],
+        }],
+      })
+    }
+  } catch (e) {
+    console.error('ECharts init error:', e)
+  }
+}
+
+function pickColor(name: string): string {
+  const map: Record<string, string> = {
+    '已交付': '#10b981', '已发货': '#2563eb', '已审批': '#60a5fa',
+    '待审批': '#f59e0b', '已结算': '#8b5cf6', '已取消': '#f56c6c',
+  }
+  return map[name] || '#909399'
+}
 
 const recentOrders = [
   { orderNo: 'SO20260615001', customer: 'ABC Trading Inc.', amount: 48500, status: 'shipped', date: '2026-06-14' },
@@ -102,74 +192,6 @@ function statusLabel(status: string): string {
 
 const trendChartRef = ref<HTMLDivElement>()
 const pieChartRef = ref<HTMLDivElement>()
-
-onMounted(async () => {
-  try {
-    const echarts = await import('echarts')
-
-    if (trendChartRef.value) {
-      const chart = echarts.init(trendChartRef.value)
-      chart.setOption({
-        tooltip: { trigger: 'axis' },
-        grid: { left: 40, right: 20, top: 10, bottom: 24 },
-        xAxis: {
-          type: 'category',
-          data: ['7月','8月','9月','10月','11月','12月','1月','2月','3月','4月','5月','6月'],
-          axisLine: { lineStyle: { color: '#e0e0e0' } },
-          axisLabel: { color: '#999', fontSize: 11 },
-        },
-        yAxis: {
-          type: 'value',
-          splitLine: { lineStyle: { color: '#f0f0f0' } },
-          axisLabel: { color: '#999', fontSize: 11 },
-        },
-        series: [
-          {
-            name: '销售额 (万美元)',
-            type: 'bar',
-            data: [42, 38, 45, 55, 48, 52, 40, 36, 50, 58, 46, 48],
-            itemStyle: { borderRadius: [4, 4, 0, 0], color: '#2563eb' },
-            barWidth: 22,
-          },
-          {
-            name: '利润 (万美元)',
-            type: 'line',
-            data: [14, 12, 15, 20, 16, 18, 13, 11, 17, 22, 15, 16],
-            smooth: true,
-            lineStyle: { color: '#10b981', width: 2 },
-            itemStyle: { color: '#10b981' },
-            symbol: 'circle',
-            symbolSize: 6,
-          },
-        ],
-      })
-    }
-
-    if (pieChartRef.value) {
-      const chart = echarts.init(pieChartRef.value)
-      chart.setOption({
-        tooltip: { trigger: 'item' },
-        legend: { bottom: 0, textStyle: { fontSize: 12 } },
-        series: [{
-          type: 'pie',
-          radius: ['55%', '78%'],
-          center: ['50%', '45%'],
-          label: { show: false },
-          data: [
-            { value: 35, name: '已交付', itemStyle: { color: '#10b981' } },
-            { value: 22, name: '已发货', itemStyle: { color: '#2563eb' } },
-            { value: 18, name: '已审批', itemStyle: { color: '#60a5fa' } },
-            { value: 12, name: '待审批', itemStyle: { color: '#f59e0b' } },
-            { value: 8, name: '已结算', itemStyle: { color: '#8b5cf6' } },
-            { value: 5, name: '已取消', itemStyle: { color: '#f56c6c' } },
-          ],
-        }],
-      })
-    }
-  } catch (e) {
-    console.error('ECharts init error:', e)
-  }
-})
 </script>
 
 <style scoped lang="scss">
