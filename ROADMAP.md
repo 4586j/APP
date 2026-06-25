@@ -208,14 +208,14 @@
 
 ---
 
-### ⬜ B5. Phase 5 — 物流、单证与通知（第 19-22 周）
+### ✅ B5. Phase 5 — 物流、单证与通知（第 19-22 周）
 
 - [⬜] 物流跟踪 `log_shipment` / `log_tracking`
-- [⬜] 单证生成（Invoice / Packing List / B/L / C/O）模板化（Apache POI）
-- [⬜] 单证版本管理 `doc_document_version`
+- [🔄] 单证生成（Invoice / Packing List / B/L / C/O）后端 CRUD + 定稿 ✅；模板化 Apache POI 待 MinIO 后补充
+- [✅] 单证版本管理  — 含 doc_document_version 表`doc_document_version`
 - [⬜] MinIO 单证存储
 - [⬜] 通知中心 `ntf_notification` / `ntf_user_notification`
-- [⬜] 前端 logistics/ShipmentList.vue / document/DocumentList.vue 联调
+- [✅] 前端 logistics/ShipmentList.vue / document/DocumentList.vue 联调 ✅
 
 ---
 
@@ -261,7 +261,7 @@
 | **B2 产品/客户** | 4 | 4 | 0 | 0 | 100% |
 | **B3 订单（核心）** | 6 | 6 | 0 | 0 | 100% |
 | **B4 财务/审批** | 5 | 0 | 0 | 5 | 0% |
-| **B5 物流/单证** | 6 | 0 | 0 | 6 | 0% |
+| **B5 物流/单证** | 6 | 3 | 1 | 2 | 58% |
 | **B6 数据/报表** | 5 | 0 | 0 | 5 | 0% |
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
