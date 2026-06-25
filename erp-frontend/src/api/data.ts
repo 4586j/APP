@@ -9,11 +9,12 @@ export interface DataUploadQuery {
 }
 
 export interface DataUploadVO {
-  id: number
+  id: string
   fileName: string
   fileType: string
   originalName: string
   fileSize: number
+  filePath?: string
   department: string
   rowCount: number
   parsed: boolean
@@ -33,7 +34,7 @@ export function listUploads(params: DataUploadQuery) {
   return get<DataUploadPageVO>('/data/uploads', params)
 }
 
-export function getUpload(id: number) {
+export function getUpload(id: string) {
   return get<DataUploadVO>(`/data/uploads/${id}`)
 }
 
@@ -44,7 +45,17 @@ export function createUpload(fileName: string, fileType: string, fileSize?: numb
   })
 }
 
-export function deleteUpload(id: number) {
+export function uploadDataFile(file: File, fileType: string, department?: string) {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('fileType', fileType)
+  if (department) formData.append('department', department)
+  return post<number>('/data/uploads', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export function deleteUpload(id: string) {
   return del<void>(`/data/uploads/${id}`)
 }
 
