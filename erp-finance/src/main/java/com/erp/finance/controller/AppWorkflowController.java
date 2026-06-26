@@ -2,12 +2,14 @@ package com.erp.finance.controller;
 import com.erp.common.model.R;
 import com.erp.finance.dto.*;
 import com.erp.finance.service.AppWorkflowService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 @RestController @RequestMapping("/api/v1/workflows") @RequiredArgsConstructor
+@Tag(name = "审批工作流")
 public class AppWorkflowController {
     final AppWorkflowService workflowService;
     @GetMapping @PreAuthorize("hasAuthority('approval:workflow:view')") public R<List<WorkflowVO>> list(){return R.ok(workflowService.list());}

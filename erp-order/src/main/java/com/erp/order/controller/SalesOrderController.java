@@ -2,11 +2,13 @@ package com.erp.order.controller;
 import com.erp.common.model.R;
 import com.erp.order.dto.*;
 import com.erp.order.service.OrdSalesOrderService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/sales-orders") @RequiredArgsConstructor
+@Tag(name = "销售订单")
 public class SalesOrderController {
     final OrdSalesOrderService salesOrderService;
     @GetMapping public R<SalesOrderPageVO> list(SalesOrderQuery q) { return R.ok(salesOrderService.listPage(q)); }

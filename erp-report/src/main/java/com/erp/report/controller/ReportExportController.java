@@ -1,4 +1,5 @@
 package com.erp.report.controller;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.erp.common.model.R;
 import com.erp.report.dto.ReportExportRequest;
 import com.erp.report.dto.ReportExportVO;
@@ -8,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController @RequestMapping("/api/v1/reports/export") @RequiredArgsConstructor
+@Tag(name = "报表导出")
 public class ReportExportController {
     final ReportExportService service;
 

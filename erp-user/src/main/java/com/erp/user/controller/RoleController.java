@@ -3,6 +3,7 @@ import com.erp.common.model.R;
 import com.erp.user.dto.*;
 import com.erp.user.dto.AssignUsersRequest;
 import com.erp.user.service.RoleService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/system/roles")
 @RequiredArgsConstructor
+@Tag(name = "角色管理")
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class RoleController {
     private final RoleService roleService;

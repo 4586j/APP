@@ -2,11 +2,13 @@ package com.erp.finance.controller;
 import com.erp.common.model.R;
 import com.erp.finance.dto.*;
 import com.erp.finance.service.AppApprovalService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/approvals") @RequiredArgsConstructor
+@Tag(name = "审批管理")
 public class AppApprovalController {
     final AppApprovalService approvalService;
     @GetMapping @PreAuthorize("hasAuthority('approval:request:view')") public R<AppApprovalPageVO> list(AppApprovalRequestQuery q){return R.ok(approvalService.listPage(q));}

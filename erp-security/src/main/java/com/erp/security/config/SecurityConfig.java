@@ -45,7 +45,14 @@ public class SecurityConfig {
             "/api/v1/auth/refresh",
             "/api/v1/auth/public-key",
             "/api/v1/auth/captcha",
-            "/actuator/health"
+            "/actuator/health",
+            // Knife4j / OpenAPI 文档（开发环境开放）
+            "/doc.html",
+            "/webjars/**",
+            "/favicon.ico",
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
     };
 
     @Bean

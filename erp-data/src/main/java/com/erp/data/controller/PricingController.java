@@ -1,4 +1,5 @@
 package com.erp.data.controller;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.erp.common.dto.BatchImportResult;
 import com.erp.common.model.R; import com.erp.data.dto.PricingPageVO;
 import com.erp.data.dto.PricingQuery; import com.erp.data.dto.PricingVO;
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @RestController @RequestMapping("/api/v1/data/pricing") @RequiredArgsConstructor
+@Tag(name = "定价分析")
 public class PricingController {
     final PricingService service;
     @GetMapping public R<PricingPageVO> list(PricingQuery q){return R.ok(service.listPage(q));}

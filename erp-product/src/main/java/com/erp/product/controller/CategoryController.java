@@ -4,6 +4,7 @@ import com.erp.common.model.R;
 import com.erp.product.dto.PrdCategoryVO;
 import com.erp.product.dto.CategoryCreateRequest;
 import com.erp.product.service.PrdCategoryService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/categories")
 @RequiredArgsConstructor
+@Tag(name = "产品分类")
 public class CategoryController {
     final PrdCategoryService categoryService;
 

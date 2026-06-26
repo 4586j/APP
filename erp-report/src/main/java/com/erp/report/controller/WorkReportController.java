@@ -1,5 +1,6 @@
 package com.erp.report.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.erp.common.model.R;
 import com.erp.report.dto.*;
 import com.erp.report.service.WorkReportService;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/work-reports")
 @RequiredArgsConstructor
+@Tag(name = "工作报表")
 public class WorkReportController {
 
     final WorkReportService service;

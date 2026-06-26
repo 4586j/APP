@@ -1,9 +1,11 @@
 package com.erp.finance.controller;
 import com.erp.common.model.R; import com.erp.finance.dto.*; import com.erp.finance.service.FinReceivableService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid; import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/receivables") @RequiredArgsConstructor
+@Tag(name = "应收管理")
 public class ReceivableController {
     final FinReceivableService service;
     @GetMapping @PreAuthorize("hasAuthority('finance:receivable:view')") public R<ReceivablePageVO> list(ReceivableQuery q){return R.ok(service.listPage(q));}

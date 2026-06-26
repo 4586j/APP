@@ -203,6 +203,21 @@
 - [✅] application.yaml 从 git 移除，添加脱敏模板 `application-example.yaml`
 - [✅] `.gitignore` 追加：application.yaml, uploads/, *.bak
 
+### ✅ 优化阶段 4 — 批量导入事务 + 分页上限 + Swagger 文档 ✅ 2026-06-26
+- [✅] **批量导入 N+1 事务修复**：
+  - [✅] `UserServiceImpl` 提取 `doCreateUser()` 无事务内部方法，`batchCreateUsers()` 外包 `@Transactional`
+  - [✅] `importUsersFromExcel()` 预加载已有用户名到内存 Set，消除循环内重复查库
+  - [✅] `PricingServiceImpl.batchImport()` 改为收集后批量插入，减少数据库往返
+- [✅] **分页接口 size 上限限制**（3 处未限制已修复）：
+  - [✅] `DatUploadServiceImpl.listPage()` → `Math.min(size, 100)`
+  - [✅] `PricingServiceImpl.listPage()` → `Math.min(size, 100)`
+  - [✅] `UserServiceImpl.pageUsers()` → `Math.min(size, 100)`
+- [✅] **Swagger / Knife4j 接口文档**：
+  - [✅] 新建 `OpenApiConfig.java`：全局 Info + JWT Bearer SecurityScheme
+  - [✅] `SecurityConfig` 放行 `/doc.html`、`/v3/api-docs/**`、`/swagger-ui/**`
+  - [✅] 26 个 Controller 添加 `@Tag(name = "...")` 注解
+  - [✅] 父 pom + `erp-common` 引入 `swagger-annotations-jakarta` 依赖
+
 ---
 
 ### ✅ B2. Phase 2 — 产品与客户（第 5-8 周）（完成）
@@ -290,7 +305,7 @@
 | **B4 财务/审批** | 5 | 3 | 0 | 2 | 60% |
 | **B5 物流/单证** | 6 | 5 | 0 | 1 | 83% |
 | **B6 数据/报表** | 5 | 5 | 0 | 0 | 100% |
-| **优化阶段 1~3** | 15 | 15 | 0 | 0 | 100% |
+| **优化阶段 1~4** | 18 | 18 | 0 | 0 | 100% |
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
@@ -346,3 +361,4 @@
 | 2026-06-24 | B1.4 Phase 2 完成（change-password / refresh / captcha + 16 单测 + 8 段 e2e 验证全绿，fontconfig 修复） | 实施 + Claude 协作 |
 | 2026-06-26 | **优化阶段 3 完成**：工作台重构 + 数据下载/导入 + 工作报表管理 + ID 精度修复 + 软删除修复 + application.yaml 脱敏 + git commit `a707071` | 实施 + Claude 协作 |
 | 2026-06-26 | ROADMAP 更新：全局进度从 46% → 65%，新增优化阶段 1~3 追踪 | 系统 |
+| 2026-06-26 | **优化阶段 4 完成**：批量导入事务修复 + 分页 size 上限 + Swagger/Knife4j 文档 | 实施 + Claude 协作 |

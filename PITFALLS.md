@@ -827,3 +827,91 @@ org.springframework.security.authorization.AuthorizationDeniedException: Access 
 > 前后端权限模型要统一：如果接口用 `hasAuthority('xxx:yyy')`，JWT/SecurityContext 里就必须放权限码，不只是角色码。
 
 **入坑日期**：2026-06-25（B1.6 系统管理联调）
+
+---
+
+## §37. 批量导入 N+1 事务：循环调用 `@Transactional` 方法导致千次数据库往返【优化阶段 4】
+
+### 现象
+`UserServiceImpl.batchCreateUsers()` 循环调用 `createUser()`（每个都有 `@Transactional`），Excel 导入 1000 条用户 = 1000 次独立事务 + 1000 次密码加密 + 2000 次 INSERT（用户+角色）。
+
+### 根因
+Spring 的 `@Transactional` 基于代理：同类内部方法调用不走代理，事务不生效；但 `batchCreateUsers` 调用 `createUser` 是**不同 public 方法**，代理会拦截，每个调用都开启/提交独立事务。
+
+### 解法
+1. **提取无事务内部方法** `doCreateUser()`，包含实际 INSERT 逻辑
+2. **批量方法加 `@Transactional`**，循环调用 `doCreateUser()`，整个 batch 在一个事务中
+3. **预加载已有用户名到内存 Set**，避免循环内重复查询数据库
+
+```java
+@Transactional(rollbackFor = Exception.class)
+public BatchImportResult batchCreateUsers(List<UserCreateRequest> list) {
+    Set<String> existing = userMapper.selectList(null).stream()
+        .map(SysUser::getUsername).collect(Collectors.toSet());
+    for (...) {
+        if (existing.contains(req.getUsername())) { ... continue; }
+        doCreateUser(req); // 无事务，复用同一连接
+        existing.add(req.getUsername());
+    }
+}
+```
+
+### 验证
+- 批量导入 100 条用户：事务数从 100 → 1 ✅
+- `importUsersFromExcel` 同样预加载用户名，减少 N+1 查询 ✅
+
+**入坑日期**：2026-06-26（优化阶段 4）
+
+---
+
+## §38. 分页接口缺少 `pageSize` 上限：客户端传 `size=100000` 可拖垮数据库【优化阶段 4】
+
+### 现象
+`DatUploadServiceImpl.listPage()` 直接使用 `new Page<>(q.getPageNum(), q.getPageSize())`，未限制最大值。恶意或误操作请求 `pageSize=100000` 会一次性加载 10 万条记录。
+
+### 根因
+MyBatis Plus 的 `Page` 对象不会自动限制 size，完全信任客户端输入。
+
+### 解法
+统一加 `Math.min(size, 100)` 上限：
+```java
+Page<DatUpload> p = mapper.selectPage(
+    new Page<>(q.getPageNum(), Math.min(q.getPageSize(), 100)), w);
+```
+
+**涉及文件**（3 处未限制，已修复）：
+- `DatUploadServiceImpl.listPage()`
+- `PricingServiceImpl.listPage()`
+- `UserServiceImpl.pageUsers()`
+
+其余 15 个分页接口已有限制。
+
+**入坑日期**：2026-06-26（优化阶段 4）
+
+---
+
+## §39. Swagger `@Tag` 注解导致编译失败：注解依赖未下沉到业务模块【优化阶段 4】
+
+### 现象
+给 26 个 Controller 添加 `@Tag(name = "...")` 后编译报错：
+```
+package io.swagger.v3.oas.annotations.tags does not exist
+```
+
+### 根因
+`knife4j-openapi3-jakarta-spring-boot-starter` 只在 `erp-web/pom.xml` 中引入，业务模块（erp-user/erp-data 等）没有 swagger-annotations 依赖。
+
+### 解法
+在 `erp-common/pom.xml` 引入轻量级注解库（所有业务模块都依赖 erp-common）：
+```xml
+<dependency>
+    <groupId>io.swagger.core.v3</groupId>
+    <artifactId>swagger-annotations-jakarta</artifactId>
+</dependency>
+```
+父 pom `dependencyManagement` 中统一版本：`2.2.22`。
+
+### 一句话教训
+> 跨模块使用的注解库，必须放在**最底层公共模块**（erp-common）或父 pom 的 `<dependencies>` 中，不能只在启动模块引入。
+
+**入坑日期**：2026-06-26（优化阶段 4）

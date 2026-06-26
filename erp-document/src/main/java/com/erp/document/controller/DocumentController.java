@@ -1,5 +1,6 @@
 package com.erp.document.controller;
 import com.erp.common.model.R; import com.erp.document.dto.*; import com.erp.document.service.DocDocumentService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid; import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders; import org.springframework.http.MediaType; import org.springframework.http.ResponseEntity;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 @RestController @RequestMapping("/api/v1/documents") @RequiredArgsConstructor
+@Tag(name = "单证管理")
 public class DocumentController {
     final DocDocumentService service;
     @GetMapping public R<DocumentPageVO> list(DocumentQuery q){return R.ok(service.listPage(q));}

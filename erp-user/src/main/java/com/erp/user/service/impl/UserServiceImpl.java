@@ -59,7 +59,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override public Page<?> pageUsers(UserQuery query) {
-        Page<SysUser> page = new Page<>(query.getPage(), query.getSize());
+        Page<SysUser> page = new Page<>(query.getPage(), Math.min(query.getSize(), 100));
         LambdaQueryWrapper<SysUser> w = new LambdaQueryWrapper<>();
         if (query.getUsername() != null) w.like(SysUser::getUsername, query.getUsername());
         if (query.getRealName() != null) w.like(SysUser::getRealName, query.getRealName());
@@ -181,22 +181,57 @@ public class UserServiceImpl implements UserService {
         userMapper.updateById(u); return count;
     }
 
+    /**
+     * 内部创建用户（无事务），供批量导入调用。
+     * 调用方需自行处理事务边界。
+     */
+    private Long doCreateUser(UserCreateRequest req) {
+        SysUser u = new SysUser();
+        u.setUsername(req.getUsername());
+        u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
+        u.setRealName(req.getRealName());
+        u.setEmail(req.getEmail());
+        u.setPhone(req.getPhone());
+        u.setDepartmentId(req.getDepartmentId());
+        u.setStatus(req.getStatus() != null ? req.getStatus() : 1);
+        userMapper.insert(u);
+        // 绑定角色
+        if (req.getRoleIds() != null && !req.getRoleIds().isEmpty()) {
+            for (Long rid : req.getRoleIds()) {
+                SysUserRole ur = new SysUserRole();
+                ur.setUserId(u.getId());
+                ur.setRoleId(rid);
+                userRoleMapper.insert(ur);
+            }
+        }
+        return u.getId();
+    }
+
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public BatchImportResult batchCreateUsers(List<UserCreateRequest> list) {
         BatchImportResult result = new BatchImportResult();
         if (list == null || list.isEmpty()) return result;
 
+        // 批量预加载已有用户名，避免 N+1 查询
+        Set<String> existingUsernames = userMapper.selectList(null).stream()
+                .map(SysUser::getUsername)
+                .collect(Collectors.toSet());
+
         for (int i = 0; i < list.size(); i++) {
             UserCreateRequest req = list.get(i);
-            try {
-                createUser(req);
-                result.setSuccessCount(result.getSuccessCount() + 1);
-            } catch (BusinessException e) {
+            if (existingUsernames.contains(req.getUsername())) {
                 BatchImportResult.FailItem item = new BatchImportResult.FailItem();
                 item.setIndex(i + 1);
                 item.setName(req.getUsername());
-                item.setReason(e.getMessage());
+                item.setReason("用户名已存在");
                 result.getFailList().add(item);
+                continue;
+            }
+            try {
+                doCreateUser(req);
+                result.setSuccessCount(result.getSuccessCount() + 1);
+                existingUsernames.add(req.getUsername());
             } catch (Exception e) {
                 BatchImportResult.FailItem item = new BatchImportResult.FailItem();
                 item.setIndex(i + 1);
@@ -223,6 +258,10 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toMap(SysDepartment::getName, SysDepartment::getId, (a, b) -> a));
         Map<String, Long> roleCodeMap = roleMapper.selectList(null).stream()
                 .collect(Collectors.toMap(SysRole::getRoleCode, SysRole::getId, (a, b) -> a));
+        // 预加载已有用户名，避免循环内重复查库
+        Set<String> existingUsernames = userMapper.selectList(null).stream()
+                .map(SysUser::getUsername)
+                .collect(Collectors.toSet());
 
         for (int i = 0; i < excelList.size(); i++) {
             UserImportExcelDTO dto = excelList.get(i);
@@ -257,8 +296,9 @@ public class UserServiceImpl implements UserService {
                 continue;
             }
 
-            // 检查用户名唯一性
-            if (loadByUsername(dto.getUsername()) != null) {
+            // 检查用户名唯一性（内存判断）
+            String trimmedUsername = dto.getUsername().trim();
+            if (existingUsernames.contains(trimmedUsername)) {
                 BatchImportResult.FailItem item = new BatchImportResult.FailItem();
                 item.setIndex(i + 2);
                 item.setName(dto.getUsername());
@@ -269,28 +309,25 @@ public class UserServiceImpl implements UserService {
 
             try {
                 UserCreateRequest req = new UserCreateRequest();
-                req.setUsername(dto.getUsername().trim());
+                req.setUsername(trimmedUsername);
                 req.setRealName(dto.getRealName().trim());
-                req.setPassword(dto.getUsername().trim()); // 默认密码 = 用户名
+                req.setPassword(trimmedUsername); // 默认密码 = 用户名
                 req.setEmail(StringUtils.hasText(dto.getEmail()) ? dto.getEmail().trim() : null);
                 req.setPhone(StringUtils.hasText(dto.getPhone()) ? dto.getPhone().trim() : null);
                 req.setDepartmentId(deptNameMap.get(dto.getDepartmentName()));
                 req.setStatus(1);
-
-                Long userId = createUser(req);
-
-                // 绑定角色
+                // Excel 导入默认绑定角色
                 if (StringUtils.hasText(dto.getRoleCode())) {
                     Long roleId = roleCodeMap.get(dto.getRoleCode());
                     if (roleId != null) {
-                        SysUserRole ur = new SysUserRole();
-                        ur.setUserId(userId);
-                        ur.setRoleId(roleId);
-                        userRoleMapper.insert(ur);
+                        req.setRoleIds(Collections.singletonList(roleId));
                     }
                 }
 
+                doCreateUser(req);
+
                 result.setSuccessCount(result.getSuccessCount() + 1);
+                existingUsernames.add(trimmedUsername);
             } catch (Exception e) {
                 BatchImportResult.FailItem item = new BatchImportResult.FailItem();
                 item.setIndex(i + 2);

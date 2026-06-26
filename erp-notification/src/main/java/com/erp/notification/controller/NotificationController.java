@@ -1,4 +1,5 @@
 package com.erp.notification.controller;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.erp.common.model.R;
 import com.erp.notification.dto.*;
 import com.erp.notification.service.NotificationService;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController @RequestMapping("/api/v1/notifications") @RequiredArgsConstructor
+@Tag(name = "通知中心")
 public class NotificationController {
     final NotificationService service;
 

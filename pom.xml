@@ -44,6 +44,7 @@
         <flyway.version>10.20.1</flyway.version>
         <easyexcel.version>4.0.3</easyexcel.version>
         <knife4j.version>4.5.0</knife4j.version>
+        <swagger-annotations.version>2.2.22</swagger-annotations.version>
         <hutool.version>5.8.32</hutool.version>
         <minio.version>8.5.13</minio.version>
         <poi.version>5.3.0</poi.version>
@@ -149,6 +150,11 @@
                 <groupId>com.github.xiaoymin</groupId>
                 <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
                 <version>${knife4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.swagger.core.v3</groupId>
+                <artifactId>swagger-annotations-jakarta</artifactId>
+                <version>${swagger-annotations.version}</version>
             </dependency>
             <dependency>
                 <groupId>cn.hutool</groupId>

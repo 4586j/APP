@@ -1,9 +1,11 @@
 package com.erp.finance.controller;
 import com.erp.common.model.R; import com.erp.finance.dto.*; import com.erp.finance.service.FinPayableService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid; import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/payables") @RequiredArgsConstructor
+@Tag(name = "应付管理")
 public class PayableController {
     final FinPayableService service;
     @GetMapping @PreAuthorize("hasAuthority('finance:payable:view')") public R<PayablePageVO> list(PayableQuery q){return R.ok(service.listPage(q));}

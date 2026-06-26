@@ -1,8 +1,10 @@
 package com.erp.logistics.controller;
 import com.erp.common.model.R; import com.erp.logistics.dto.*; import com.erp.logistics.service.LogShipmentService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid; import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/shipments") @RequiredArgsConstructor
+@Tag(name = "物流管理")
 public class ShipmentController {
     final LogShipmentService service;
     @GetMapping public R<ShipmentPageVO> list(ShipmentQuery q){return R.ok(service.listPage(q));}

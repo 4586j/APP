@@ -2,11 +2,13 @@ package com.erp.order.controller;
 import com.erp.common.model.R;
 import com.erp.order.dto.*;
 import com.erp.order.service.OrdPurchaseOrderService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/purchase-orders") @RequiredArgsConstructor
+@Tag(name = "采购订单")
 public class PurchaseOrderController {
     final OrdPurchaseOrderService purchaseOrderService;
     @GetMapping public R<PurchaseOrderPageVO> list(PurchaseOrderQuery q) { return R.ok(purchaseOrderService.listPage(q)); }

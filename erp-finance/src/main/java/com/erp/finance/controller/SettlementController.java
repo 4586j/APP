@@ -1,8 +1,10 @@
 package com.erp.finance.controller;
 import com.erp.common.model.R; import com.erp.finance.dto.*; import com.erp.finance.service.FinSettlementService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid; import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/settlements") @RequiredArgsConstructor
+@Tag(name = "结算管理")
 public class SettlementController {
     final FinSettlementService service;
     @GetMapping public R<SettlementPageVO> list(SettlementQuery q){return R.ok(service.listPage(q));}

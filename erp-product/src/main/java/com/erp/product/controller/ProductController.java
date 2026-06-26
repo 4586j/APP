@@ -2,12 +2,14 @@ package com.erp.product.controller;
 import com.erp.common.model.R;
 import com.erp.product.dto.*;
 import com.erp.product.service.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController @RequestMapping("/api/v1/products") @RequiredArgsConstructor
+@Tag(name = "产品管理")
 public class ProductController {
     final PrdProductService productService;
     @GetMapping public R<ProductPageVO> list(ProductQuery q){ return R.ok(productService.listPage(q)); }

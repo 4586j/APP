@@ -6,6 +6,7 @@ import com.erp.user.dto.DepartmentOption;
 import com.erp.user.dto.DepartmentTreeNode;
 import com.erp.user.dto.DepartmentUpdateRequest;
 import com.erp.user.service.DepartmentService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/system/departments")
 @RequiredArgsConstructor
+@Tag(name = "部门管理")
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class DepartmentController {
     private final DepartmentService departmentService;

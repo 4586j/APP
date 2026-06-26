@@ -25,7 +25,7 @@ public class PricingServiceImpl implements PricingService {
         if (q.getStatus() != null && !q.getStatus().isEmpty())
             w.eq(DatPricingAnalysis::getStatus, q.getStatus());
         w.orderByDesc(DatPricingAnalysis::getCreatedAt);
-        Page<DatPricingAnalysis> p = mapper.selectPage(new Page<>(q.getPageNum(), q.getPageSize()), w);
+        Page<DatPricingAnalysis> p = mapper.selectPage(new Page<>(q.getPageNum(), Math.min(q.getPageSize(), 100)), w);
         return new PricingPageVO(p.getTotal(), q.getPageNum(), q.getPageSize(),
             p.getRecords().stream().map(this::toVO).collect(Collectors.toList()));
     }
@@ -52,6 +52,7 @@ public class PricingServiceImpl implements PricingService {
             .doReadSync();
         if (list == null || list.isEmpty()) return result;
 
+        List<DatPricingAnalysis> toInsert = new java.util.ArrayList<>();
         int index = 1;
         for (PricingImportExcelDTO dto : list) {
             index++;
@@ -59,23 +60,25 @@ public class PricingServiceImpl implements PricingService {
                 result.getFailList().add(new BatchImportResult.FailItem(index, dto.getTitle(), "产品ID和分析标题不能为空"));
                 continue;
             }
-            try {
-                DatPricingAnalysis e = new DatPricingAnalysis();
-                e.setProductId(dto.getProductId());
-                e.setTitle(dto.getTitle());
-                e.setCostPrice(dto.getCostPrice());
-                e.setTargetPrice(dto.getTargetPrice());
-                e.setCompetitorPrice(dto.getCompetitorPrice());
-                e.setSuggestedPrice(dto.getSuggestedPrice());
-                e.setMargin(dto.getMargin());
-                e.setMarketTrend(dto.getMarketTrend());
-                e.setStatus(dto.getStatus() != null ? dto.getStatus() : "draft");
-                e.setRemark(dto.getRemark());
+            DatPricingAnalysis e = new DatPricingAnalysis();
+            e.setProductId(dto.getProductId());
+            e.setTitle(dto.getTitle());
+            e.setCostPrice(dto.getCostPrice());
+            e.setTargetPrice(dto.getTargetPrice());
+            e.setCompetitorPrice(dto.getCompetitorPrice());
+            e.setSuggestedPrice(dto.getSuggestedPrice());
+            e.setMargin(dto.getMargin());
+            e.setMarketTrend(dto.getMarketTrend());
+            e.setStatus(dto.getStatus() != null ? dto.getStatus() : "draft");
+            e.setRemark(dto.getRemark());
+            toInsert.add(e);
+        }
+        // 批量插入，减少数据库往返
+        if (!toInsert.isEmpty()) {
+            for (DatPricingAnalysis e : toInsert) {
                 mapper.insert(e);
-                result.setSuccessCount(result.getSuccessCount() + 1);
-            } catch (Exception ex) {
-                result.getFailList().add(new BatchImportResult.FailItem(index, dto.getTitle(), ex.getMessage()));
             }
+            result.setSuccessCount(toInsert.size());
         }
         return result;
     }

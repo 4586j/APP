@@ -2,11 +2,13 @@ package com.erp.finance.controller;
 import com.erp.common.model.R;
 import com.erp.finance.dto.*;
 import com.erp.finance.service.FinExchangeRateService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/exchange-rates") @RequiredArgsConstructor
+@Tag(name = "汇率管理")
 public class ExchangeRateController {
     final FinExchangeRateService rateService;
     @GetMapping @PreAuthorize("hasAuthority('finance:exchange-rate:view')") public R<ExchangeRatePageVO> list(ExchangeRateQuery q){return R.ok(rateService.listPage(q));}

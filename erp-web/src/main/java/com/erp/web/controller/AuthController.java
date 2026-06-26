@@ -1,5 +1,6 @@
 package com.erp.web.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.erp.common.exception.BusinessException;
 import com.erp.common.model.R;
 import com.erp.security.dto.CaptchaResponse;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
+@Tag(name = "认证授权")
 public class AuthController {
 
     private final AuthService authService;

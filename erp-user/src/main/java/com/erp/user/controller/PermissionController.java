@@ -2,6 +2,7 @@ package com.erp.user.controller;
 import com.erp.common.model.R;
 import com.erp.user.dto.*;
 import com.erp.user.service.PermissionService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/system/permissions")
 @RequiredArgsConstructor
+@Tag(name = "权限管理")
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class PermissionController {
     private final PermissionService permissionService;

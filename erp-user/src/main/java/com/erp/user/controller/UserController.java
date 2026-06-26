@@ -3,6 +3,7 @@ import com.erp.common.dto.BatchImportResult;
 import com.erp.common.model.R;
 import com.erp.user.dto.*;
 import com.erp.user.service.UserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/system/users")
 @RequiredArgsConstructor
+@Tag(name = "用户管理")
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "erp.user.persistence", havingValue = "mysql", matchIfMissing = true)
 public class UserController {
     private final UserService userService;

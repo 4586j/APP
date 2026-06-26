@@ -45,7 +45,7 @@ public class DatUploadServiceImpl implements DatUploadService {
             w.eq(DatUpload::getFileType, q.getFileType());
         }
         w.orderByDesc(DatUpload::getCreatedAt);
-        Page<DatUpload> p = mapper.selectPage(new Page<>(q.getPageNum(), q.getPageSize()), w);
+        Page<DatUpload> p = mapper.selectPage(new Page<>(q.getPageNum(), Math.min(q.getPageSize(), 100)), w);
         return new DataUploadPageVO(p.getTotal(), q.getPageNum(), q.getPageSize(),
             p.getRecords().stream().map(this::toVO).collect(Collectors.toList()));
     }
