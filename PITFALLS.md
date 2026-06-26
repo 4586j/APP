@@ -915,3 +915,102 @@ package io.swagger.v3.oas.annotations.tags does not exist
 > 跨模块使用的注解库，必须放在**最底层公共模块**（erp-common）或父 pom 的 `<dependencies>` 中，不能只在启动模块引入。
 
 **入坑日期**：2026-06-26（优化阶段 4）
+
+---
+
+## §40. JVM 打包时反复 SIGSEGV 崩溃：服务器环境内存/GC 问题【优化阶段 4~5】
+
+### 现象
+执行 `mvn clean package` 时 JVM 随机崩溃：
+```
+# A fatal error has been detected by the Java Runtime Environment:
+# SIGSEGV (0xb) at pc=0x00007f... libjvm.so
+# Problematic frame: PhaseCFG::schedule_pinned_nodes
+```
+崩溃位置在 `libjvm.so` 内部（JIT 编译阶段），与项目代码无关。
+
+### 根因
+服务器 JDK 17（build 17+35-2724）在 CentOS 7 环境下，JVM JIT 编译器（C2/G1GC）触发已知 bug。
+
+### 解法
+打包时使用保守 JVM 参数：
+```bash
+MAVEN_OPTS="-Xmx512m -XX:+UseSerialGC -XX:-TieredCompilation" \
+    mvn clean package -DskipTests -Dmaven.test.skip=true -T1
+```
+- `-Xmx512m`：限制堆内存
+- `-XX:+UseSerialGC`：单线程串行 GC，避免并发 GC bug
+- `-XX:-TieredCompilation`：关闭分层编译（绕过 JIT C2 崩溃点）
+- `-T1`：Maven 单线程构建
+
+**注意**：这些参数仅用于打包构建阶段，运行阶段仍用默认 G1GC。
+
+**入坑日期**：2026-06-26（优化阶段 4~5）
+
+---
+
+## §41. Redis Key 命名混乱导致排查困难【优化阶段 5】
+
+### 现象
+`redis-cli KEYS '*'` 返回的 key 五花八门：
+```
+auth:blacklist:xxx
+demo2:department:options
+auth:captcha:yyy
+```
+没有统一前缀，难以通过 `KEYS erp:user:*` 快速定位模块缓存。
+
+### 根因
+3 个缓存场景由不同开发者在不同时间实现，各自独立命名。
+
+### 解法
+统一规范为 `erp:{module}:{entity}:{id}`：
+```
+erp:security:blacklist:{jti}
+erp:security:captcha:{uuid}
+erp:user:department:options
+erp:user:permission:tree
+erp:user:permission:list
+erp:user:role:list
+erp:user:username:{username}
+erp:security:login-fail:{username}
+```
+
+### 一句话教训
+> 缓存 Key 必须在项目初期定义规范，否则后期改名需要同时改代码和清 Redis 数据。
+
+**入坑日期**：2026-06-26（优化阶段 5）
+
+---
+
+## §42. `INCR + EXPIRE` 非原子性导致登录失败计数异常【优化阶段 5】
+
+### 现象
+高并发暴力破解场景下，同一用户短时间内连续登录失败，计数器可能出现：
+- 计数正确但无过期时间（key 永不过期）
+- 过期时间被重置（每次失败都重新 15 分钟）
+
+### 根因
+```java
+// 错误写法（非原子性）
+redisTemplate.opsForValue().increment(key);
+redisTemplate.expire(key, 15, TimeUnit.MINUTES); // 这两步之间可能被打断
+```
+
+### 解法
+使用 Lua 脚本保证原子性：
+```lua
+local v = redis.call('incr', KEYS[1])
+if v == 1 then redis.call('expire', KEYS[1], ARGV[1]) end
+return v
+```
+
+Spring Data Redis 中：
+```java
+RedisScript<Long> script = RedisScript.of(lua, Long.class);
+Long count = redisTemplate.execute(script,
+    Collections.singletonList(key),
+    String.valueOf(windowSeconds));
+```
+
+**入坑日期**：2026-06-26（优化阶段 5）

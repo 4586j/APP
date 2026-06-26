@@ -13,11 +13,15 @@ import com.erp.user.mapper.SysRoleMapper;
 import com.erp.user.mapper.SysRolePermissionMapper;
 import com.erp.user.mapper.SysUserRoleMapper;
 import com.erp.user.service.RoleService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,10 +33,29 @@ public class RoleServiceImpl implements RoleService {
     private final SysRoleMapper roleMapper;
     private final SysRolePermissionMapper rolePermissionMapper;
     private final SysUserRoleMapper userRoleMapper;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+
+    private static final String ROLE_LIST_CACHE_KEY = "erp:user:role:list";
+    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
 
     @Override
     public List<RoleVO> listAll() {
-        return roleMapper.selectList(null).stream().map(this::toVO).collect(Collectors.toList());
+        String cached = redisTemplate.opsForValue().get(ROLE_LIST_CACHE_KEY);
+        if (cached != null) {
+            try {
+                return objectMapper.readValue(cached, new TypeReference<List<RoleVO>>() {});
+            } catch (Exception e) {
+                log.warn("Parse role list cache failed, rebuild", e);
+            }
+        }
+        List<RoleVO> result = roleMapper.selectList(null).stream().map(this::toVO).collect(Collectors.toList());
+        try {
+            redisTemplate.opsForValue().set(ROLE_LIST_CACHE_KEY, objectMapper.writeValueAsString(result), CACHE_TTL);
+        } catch (Exception e) {
+            log.warn("Write role list cache failed", e);
+        }
+        return result;
     }
 
     @Override
@@ -75,6 +98,7 @@ public class RoleServiceImpl implements RoleService {
         r.setDescription(req.getDescription());
         r.setStatus(1);
         roleMapper.insert(r);
+        clearCache();
         return r.getId();
     }
 
@@ -95,6 +119,7 @@ public class RoleServiceImpl implements RoleService {
             r.setDataScope(req.getDataScope());
         }
         roleMapper.updateById(r);
+        clearCache();
     }
 
     @Override
@@ -106,6 +131,7 @@ public class RoleServiceImpl implements RoleService {
         roleMapper.deleteById(id);
         rolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, id));
         userRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, id));
+        clearCache();
     }
 
     @Override
@@ -123,6 +149,7 @@ public class RoleServiceImpl implements RoleService {
                 userRoleMapper.insert(ur);
             }
         }
+        clearCache();
     }
 
     @Override
@@ -140,5 +167,10 @@ public class RoleServiceImpl implements RoleService {
                 rolePermissionMapper.insert(rp);
             }
         }
+        clearCache();
+    }
+
+    private void clearCache() {
+        redisTemplate.delete(ROLE_LIST_CACHE_KEY);
     }
 }

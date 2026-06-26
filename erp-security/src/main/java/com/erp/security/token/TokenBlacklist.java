@@ -19,8 +19,8 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class TokenBlacklist {
 
-    /** Redis key 前缀。 */
-    public static final String KEY_PREFIX = "auth:blacklist:";
+    /** Redis key 前缀：erp:{module}:{entity}。 */
+    public static final String KEY_PREFIX = "erp:security:blacklist:";
 
     private final StringRedisTemplate redisTemplate;
 

@@ -218,6 +218,27 @@
   - [✅] 26 个 Controller 添加 `@Tag(name = "...")` 注解
   - [✅] 父 pom + `erp-common` 引入 `swagger-annotations-jakarta` 依赖
 
+### ✅ 优化阶段 5 — Redis 缓存优化 ✅ 2026-06-26
+- [✅] **统一缓存 Key 命名规范**：
+  - [✅] `auth:blacklist:` → `erp:security:blacklist:`
+  - [✅] `auth:captcha:` → `erp:security:captcha:`
+  - [✅] `demo2:department:options` → `erp:user:department:options`
+- [✅] **权限树 + 角色列表缓存**：
+  - [✅] `PermissionServiceImpl.treeAll()` → `erp:user:permission:tree`（10 分钟 TTL）
+  - [✅] `PermissionServiceImpl.listAll()` → `erp:user:permission:list`（10 分钟 TTL）
+  - [✅] `RoleServiceImpl.listAll()` → `erp:user:role:list`（10 分钟 TTL）
+  - [✅] 增删改时主动清除缓存
+- [✅] **用户信息按用户名缓存**：
+  - [✅] `UserServiceImpl.loadByUsername()` → `erp:user:username:{name}`（10 分钟 TTL）
+  - [✅] 用户变更/删除/锁定/解锁/改密时主动失效
+- [✅] **登录失败计数 Redis 化**：
+  - [✅] `recordLoginFailure()` 改为 Redis `INCR + EXPIRE`（Lua 脚本保证原子性）
+  - [✅] `recordLoginSuccess()` 清除失败计数
+  - [✅] Redis 不可用时降级到数据库计数
+- [✅] **缓存异常降级封装**：
+  - [✅] 新建 `CacheTemplate.java`（统一 fail-open 降级，Redis 异常时查数据库不阻断）
+  - [✅] `erp-common` 引入 `spring-boot-starter-data-redis` 依赖
+
 ---
 
 ### ✅ B2. Phase 2 — 产品与客户（第 5-8 周）（完成）
@@ -305,14 +326,15 @@
 | **B4 财务/审批** | 5 | 3 | 0 | 2 | 60% |
 | **B5 物流/单证** | 6 | 5 | 0 | 1 | 83% |
 | **B6 数据/报表** | 5 | 5 | 0 | 0 | 100% |
-| **优化阶段 1~4** | 18 | 18 | 0 | 0 | 100% |
+| **优化阶段 1~5** | 23 | 23 | 0 | 0 | 100% |
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
-**全局进度**：现状盘点 100% / 实际开发 ≈ 65%（B0~B1 ✅ / B2~B3 ✅ / B4 部分 ✅ / B5~B6 ✅ / 优化 1~3 ✅）
+**全局进度**：现状盘点 100% / 实际开发 ≈ 68%（B0~B1 ✅ / B2~B3 ✅ / B4 部分 ✅ / B5~B6 ✅ / 优化 1~5 ✅）
 - 后端：14 模块全部可用，37 个 Flyway 迁移，systemd 自动重启
 - 前端：14 个业务页面 + 工作台全部联调通过
-- 最近提交：`a707071`（140 文件变更，+7426 -567）
+- Redis 缓存：Token 黑名单 / 验证码 / 部门选项 / 权限树 / 角色列表 / 用户信息 / 登录失败计数
+- 最近提交：`d24a60f`（35 文件变更，+293 -37）
 
 ---
 
@@ -362,3 +384,4 @@
 | 2026-06-26 | **优化阶段 3 完成**：工作台重构 + 数据下载/导入 + 工作报表管理 + ID 精度修复 + 软删除修复 + application.yaml 脱敏 + git commit `a707071` | 实施 + Claude 协作 |
 | 2026-06-26 | ROADMAP 更新：全局进度从 46% → 65%，新增优化阶段 1~3 追踪 | 系统 |
 | 2026-06-26 | **优化阶段 4 完成**：批量导入事务修复 + 分页 size 上限 + Swagger/Knife4j 文档 | 实施 + Claude 协作 |
+| 2026-06-26 | **优化阶段 5 完成**：Redis 缓存优化（Key 规范 + 权限树/角色列表/用户缓存 + 登录失败计数 Redis 化 + CacheTemplate 降级封装） | 实施 + Claude 协作 |

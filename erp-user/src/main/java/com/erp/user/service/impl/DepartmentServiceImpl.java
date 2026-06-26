@@ -38,7 +38,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    private static final String DEPT_OPTIONS_CACHE_KEY = "demo2:department:options";
+    private static final String DEPT_OPTIONS_CACHE_KEY = "erp:user:department:options";
     private static final Duration CACHE_TTL = Duration.ofMinutes(5);
 
     @Override

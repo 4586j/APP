@@ -32,8 +32,8 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class CaptchaService {
 
-    /** Redis key 前缀。 */
-    public static final String KEY_PREFIX = "auth:captcha:";
+    /** Redis key 前缀：erp:{module}:{entity}。 */
+    public static final String KEY_PREFIX = "erp:security:captcha:";
 
     /** 字符集：去掉容易混淆的 0/O/1/I/L。 */
     private static final char[] CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ".toCharArray();

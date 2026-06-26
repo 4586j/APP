@@ -15,12 +15,15 @@ import com.erp.user.mapper.*;
 import com.erp.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -38,13 +41,46 @@ public class UserServiceImpl implements UserService {
     private final SysDepartmentMapper departmentMapper;
     private final SysDepartmentPermissionMapper deptPermMapper;
     private final PasswordEncoder passwordEncoder;
+    private final StringRedisTemplate redisTemplate;
+
     private static final int MAX_LOGIN_FAILURES = 5;
+    private static final String USER_CACHE_PREFIX = "erp:user:username:";
+    private static final String LOGIN_FAIL_PREFIX = "erp:security:login-fail:";
+    private static final Duration USER_CACHE_TTL = Duration.ofMinutes(10);
+    private static final Duration LOGIN_FAIL_WINDOW = Duration.ofMinutes(15);
+
+    /** Lua 脚本：INCR + EXPIRE（仅首次设置过期时间，保证原子性）。 */
+    private static final RedisScript<Long> INCR_EXPIRE_SCRIPT = RedisScript.of(
+            "local v = redis.call('incr', KEYS[1]) " +
+            "if v == 1 then redis.call('expire', KEYS[1], ARGV[1]) end " +
+            "return v", Long.class);
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
 
-    @Override public SysUser loadByUsername(String username) {
-        return userMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+    @Override
+    public SysUser loadByUsername(String username) {
+        String key = USER_CACHE_PREFIX + username;
+        try {
+            String cached = redisTemplate.opsForValue().get(key);
+            if (cached != null && !"null".equals(cached)) {
+                // 简单字段缓存：只缓存 id 用于快速存在性判断，
+                // 完整对象序列化太复杂，这里用 id 做存在性缓存即可
+                Long userId = Long.valueOf(cached);
+                return userMapper.selectById(userId);
+            }
+        } catch (Exception e) {
+            log.warn("读取用户缓存失败, username={}: {}", username, e.getMessage());
+        }
+        SysUser u = userMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+        if (u != null) {
+            try {
+                redisTemplate.opsForValue().set(key, String.valueOf(u.getId()), USER_CACHE_TTL);
+            } catch (Exception e) {
+                log.warn("写入用户缓存失败, username={}: {}", username, e.getMessage());
+            }
+        }
+        return u;
     }
     @Override public List<String> getRolesByUserId(Long userId) { return roleMapper.selectRolesByUserId(userId); }
     @Override public List<String> getPermissionsByUserId(Long userId) {
@@ -138,9 +174,12 @@ public class UserServiceImpl implements UserService {
         if (req.getPhone() != null) u.setPhone(req.getPhone());
         if (req.getDepartmentId() != null) u.setDepartmentId(req.getDepartmentId());
         userMapper.updateById(u);
+        evictUserCache(u.getUsername());
     }
     @Override @Transactional(rollbackFor = Exception.class) public void deleteUser(Long id) {
-        if (userMapper.selectById(id) == null) throw new BusinessException(R.CODE_NOT_FOUND, "user not found");
+        SysUser u = userMapper.selectById(id);
+        if (u == null) throw new BusinessException(R.CODE_NOT_FOUND, "user not found");
+        evictUserCache(u.getUsername());
         userMapper.deleteById(id);
         userRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, id));
     }
@@ -148,37 +187,75 @@ public class UserServiceImpl implements UserService {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BusinessException(R.CODE_NOT_FOUND, "user not found");
         u.setStatus(0); userMapper.updateById(u);
+        evictUserCache(u.getUsername());
     }
     @Override @Transactional(rollbackFor = Exception.class) public void unlockUser(Long id) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BusinessException(R.CODE_NOT_FOUND, "user not found");
         u.setStatus(1); u.setLoginFailCount(0); u.setLockedUntil(null); userMapper.updateById(u);
+        evictUserCache(u.getUsername());
     }
     @Override @Transactional(rollbackFor = Exception.class) public void resetPassword(Long id, String newPassword) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BusinessException(R.CODE_NOT_FOUND, "user not found");
         u.setPasswordHash(passwordEncoder.encode(newPassword)); userMapper.updateById(u);
+        evictUserCache(u.getUsername());
     }
     @Override @Transactional(rollbackFor = Exception.class) public void assignRoles(Long userId, List<Long> roleIds) {
         userRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
         if (roleIds != null && !roleIds.isEmpty())
             for (Long rid : roleIds) { SysUserRole ur = new SysUserRole(); ur.setUserId(userId); ur.setRoleId(rid); userRoleMapper.insert(ur); }
+        // 角色变更影响权限，清除用户缓存让下次加载重新聚合
+        SysUser u = userMapper.selectById(userId);
+        if (u != null) evictUserCache(u.getUsername());
     }
     @Override @Transactional(rollbackFor = Exception.class) public void updatePassword(String username, String encryptedPassword) {
         SysUser u = loadByUsername(username);
         if (u == null) throw new BusinessException(R.CODE_NOT_FOUND, "user not found");
         u.setPasswordHash(encryptedPassword); userMapper.updateById(u);
+        evictUserCache(username);
     }
     @Override @Transactional(rollbackFor = Exception.class) public void recordLoginSuccess(String username, String ip) {
         SysUser u = loadByUsername(username); if (u == null) return;
         u.setLastLoginTime(LocalDateTime.now()); u.setLoginFailCount(0); u.setLockedUntil(null); userMapper.updateById(u);
+        // 清除登录失败计数 + 用户缓存
+        redisTemplate.delete(LOGIN_FAIL_PREFIX + username);
+        redisTemplate.delete(USER_CACHE_PREFIX + username);
     }
-    @Override @Transactional(rollbackFor = Exception.class) public int recordLoginFailure(String username) {
-        SysUser u = loadByUsername(username); if (u == null) return 0;
-        int count = (u.getLoginFailCount() == null ? 0 : u.getLoginFailCount()) + 1;
-        u.setLoginFailCount(count);
-        if (count >= MAX_LOGIN_FAILURES) { u.setLockedUntil(LocalDateTime.now().plusMinutes(15)); u.setStatus(0); }
-        userMapper.updateById(u); return count;
+    @Override
+    public int recordLoginFailure(String username) {
+        SysUser u = loadByUsername(username);
+        if (u == null) return 0;
+        // 已锁定用户直接返回（避免继续计数）
+        if (u.getStatus() != null && u.getStatus() == 0) return u.getLoginFailCount() != null ? u.getLoginFailCount() : MAX_LOGIN_FAILURES;
+
+        Long count;
+        try {
+            count = redisTemplate.execute(INCR_EXPIRE_SCRIPT,
+                    Collections.singletonList(LOGIN_FAIL_PREFIX + username),
+                    String.valueOf(LOGIN_FAIL_WINDOW.getSeconds()));
+        } catch (Exception e) {
+            log.warn("Redis 登录失败计数失败, fallback 到数据库: {}", e.getMessage());
+            // fallback：回数据库计数
+            count = (long) ((u.getLoginFailCount() == null ? 0 : u.getLoginFailCount()) + 1);
+            u.setLoginFailCount(count.intValue());
+            if (count >= MAX_LOGIN_FAILURES) {
+                u.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+                u.setStatus(0);
+            }
+            userMapper.updateById(u);
+            return count.intValue();
+        }
+
+        if (count == null) count = 1L;
+        // 达到阈值时锁定用户（写数据库）
+        if (count >= MAX_LOGIN_FAILURES) {
+            u.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+            u.setStatus(0);
+            u.setLoginFailCount(count.intValue());
+            userMapper.updateById(u);
+        }
+        return count.intValue();
     }
 
     /**
@@ -337,5 +414,14 @@ public class UserServiceImpl implements UserService {
             }
         }
         return result;
+    }
+
+    private void evictUserCache(String username) {
+        if (username == null) return;
+        try {
+            redisTemplate.delete(USER_CACHE_PREFIX + username);
+        } catch (Exception e) {
+            log.warn("清除用户缓存失败, username={}: {}", username, e.getMessage());
+        }
     }
 }
