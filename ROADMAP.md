@@ -3,7 +3,7 @@
 > **项目位置**：`server3:/code/demo2`
 > **文档来源**：基于 `guide/DEV_STEPS.md` 8 阶段路线图 + 当前代码现状盘点
 > **创建日期**：2026-06-24
-> **最后更新**：2026-06-24
+> **最后更新**：2026-06-26
 
 ---
 
@@ -164,17 +164,44 @@
 - [✅] RoleVO.permissionIds 回填
 - [✅] 前端 UserManage/RoleManage 接真实系统 API
 - [✅] 侧边栏按 DB permissions 过滤
-- [⬜] 用户新建/编辑/删除 UI（并入 B2）
-- [⬜] Excel/CSV 批量导入（B2 计划）
 - [✅] `sys_department` 树形 CRUD（含 `parent_id` + `dept_path`）
 - [✅] `sys_user` CRUD（含直属上级 superior_id、登录失败锁定）
-- [✅] `sys_role` CRUD（含 `data_scope` 数据权限粒度 1/2/3/4）
+- [✅] `sys_role` CRUD（含 `data_scope` 数据权限粒度精简为 3 档）
 - [✅] `sys_permission` CRUD（菜单+按钮+API，含 `http_method`）
 - [✅] 用户-角色绑定、角色-权限绑定
 - [✅] 管理员重置密码、用户改密（接口）
-- [⬜] 前端 `system/UserManage.vue` / `RoleManage.vue` 联调
 - [✅] `MysqlUserDetailsLoader` 装配修复（`@ConditionalOnProperty` 替换 `@ConditionalOnBean`）
-- [⬜] DB 列对齐（BaseEntity ↔ schema：`updated_by` 等缺列待 V3 migration）
+- [✅] DB 列对齐（BaseEntity ↔ schema：V3/V4 migration 补 `updated_by` / `deleted` / `version`）
+
+---
+
+### ✅ 优化阶段 1 — ID 精度修复 + 软删除修复 ✅ 2026-06-26
+- [✅] 全局 Jackson Long→String 序列化（`JacksonConfig.java`）
+- [✅] 前端统一 `export type Id = string | number`
+- [✅] `api/data.ts` / `api/system.ts` 所有 ID 字段改为 `Id` 类型
+- [✅] 修复 `sys_department` 软删除 + 唯一索引冲突（V34：复合唯一索引 `uk_dept_code_deleted`）
+
+### ✅ 优化阶段 2 — DepartmentSelect + 权限管理 + 用户批量导入 ✅ 2026-06-26
+- [✅] `DepartmentSelect.vue` 改为 `el-tree-select`（支持树形选择）
+- [✅] 部门管理页面 `DepartmentManage.vue`（树形表格 + 新增/编辑）
+- [✅] 权限管理页面 `PermissionManage.vue`（树形表格 + 新增/编辑/删除）
+- [✅] 用户批量导入：前端 Excel 真实预览 + 后端 EasyExcel 解析
+- [✅] `BatchImportResult` 从 erp-user 移到 erp-common 供跨模块复用
+
+### ✅ 优化阶段 3 — 工作台重构 + 数据下载/导入 + 工作报表 ✅ 2026-06-26
+- [✅] 首页从"仪表盘"重构为"个人工作台"（欢迎区/快捷入口/待办/通知/审批/统计）
+- [✅] 实时时钟 + 动态问候语 + 权限过滤快捷入口
+- [✅] 数据中心文件下载接口（`GET /data/uploads/{id}/download`）+ 权限 `data:upload:download`
+- [✅] 定价分析 Excel 批量导入 + 模板下载（`xlsx` 前端预览 + EasyExcel 后端解析）
+- [✅] 完善退出登录（清 Redis Token + 清本地存储 + 跳转登录页）
+- [✅] **工作报表模块**：
+  - [✅] 工作计划（`rpt_work_plan`）：每天 08:30-10:30 限时填写/修改/提交
+  - [✅] 工作日志（`rpt_work_log`）：随时填写/修改/提交
+  - [✅] 管理界面合并显示（按日期/部门/状态/类型筛选 + 关键词搜索）
+  - [✅] 批量审批（一键通过/驳回 + 审批意见）
+  - [✅] 工作台集成：今日状态卡片 + 当月统计（计划数/日志数/驳回数）
+- [✅] application.yaml 从 git 移除，添加脱敏模板 `application-example.yaml`
+- [✅] `.gitignore` 追加：application.yaml, uploads/, *.bak
 
 ---
 
@@ -260,13 +287,17 @@
 | **B1 基础设施** | 5 | 3 | 1 | 1 | 60% |
 | **B2 产品/客户** | 4 | 4 | 0 | 0 | 100% |
 | **B3 订单（核心）** | 6 | 6 | 0 | 0 | 100% |
-| **B4 财务/审批** | 5 | 0 | 0 | 5 | 0% |
+| **B4 财务/审批** | 5 | 3 | 0 | 2 | 60% |
 | **B5 物流/单证** | 6 | 5 | 0 | 1 | 83% |
-| **B6 数据/报表** | 5 | 4 | 0 | 1 | 80% |
+| **B6 数据/报表** | 5 | 5 | 0 | 0 | 100% |
+| **优化阶段 1~3** | 15 | 15 | 0 | 0 | 100% |
 | **B7 测试/部署** | 7 | 0 | 0 | 7 | 0% |
 | **B8 交付** | 5 | 0 | 0 | 5 | 0% |
 
-**全局进度**：现状盘点 100% / 实际开发 ≈ 46%（B2.1 产品模块后端+前端完成）（B0 ✅ / B1.1 ✅ / B1.2 ✅ / B1.3 ✅ / B1.4 Phase 1+2 ✅ / B1 前端登录 ✅ / **B1.5 erp-user 后端 ✅**（@ConditionalOnProperty 修复装配时序）/ 共 15 commits 71 测试通过 + Flyway V2 button 权限 + MysqlUserDetailsLoader 生产装配）
+**全局进度**：现状盘点 100% / 实际开发 ≈ 65%（B0~B1 ✅ / B2~B3 ✅ / B4 部分 ✅ / B5~B6 ✅ / 优化 1~3 ✅）
+- 后端：14 模块全部可用，37 个 Flyway 迁移，systemd 自动重启
+- 前端：14 个业务页面 + 工作台全部联调通过
+- 最近提交：`a707071`（140 文件变更，+7426 -567）
 
 ---
 
@@ -313,4 +344,5 @@
 | 2026-06-24 | B1.4 Phase 1 完成（erp-security JWT 最小认证 + 11 单测），commit 56d4f86 | 实施 + Claude 协作 |
 | 2026-06-24 | B1.2 完成（MySQL 8 + Redis 7 yum 装、Flyway V1 6 表 + admin seed、starter-jdbc 修复、端到端登录 OK） | 实施 |
 | 2026-06-24 | B1.4 Phase 2 完成（change-password / refresh / captcha + 16 单测 + 8 段 e2e 验证全绿，fontconfig 修复） | 实施 + Claude 协作 |
-| 2026-06-24 | PITFALLS 追加 §12（erp-security 缺 starter-web）| 实施 |
+| 2026-06-26 | **优化阶段 3 完成**：工作台重构 + 数据下载/导入 + 工作报表管理 + ID 精度修复 + 软删除修复 + application.yaml 脱敏 + git commit `a707071` | 实施 + Claude 协作 |
+| 2026-06-26 | ROADMAP 更新：全局进度从 46% → 65%，新增优化阶段 1~3 追踪 | 系统 |

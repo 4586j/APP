@@ -4,7 +4,8 @@
 > **技术栈**：Spring Boot 3.3.5 + MyBatis-Plus + MySQL 8 + Redis 7 + Vue 3 + Element Plus + Vite 5
 > **目标用户**：100 人左右外贸企业（采购/销售/数据/财务/管理 5 部门）
 > **总工期**：约 8 个月（32 周）
-> **当前阶段**：🟡 第 0 步 — 项目初始化（骨架已生成，待重构）
+> **当前阶段**：🟢 第 6 阶段 — 数据报表 + 工作台 + 工作报表管理（开发中）
+> **最后更新**：2026-06-26
 
 ---
 
@@ -12,12 +13,16 @@
 
 | 维度 | 状态 | 说明 |
 |------|------|------|
-| 后端骨架 | ⬜ 待重构 | 仅 1 个空 `Demo2Application.java` + 空 yaml，需重构为 14 子模块 Maven 父子工程 |
-| pom 父版本 | ⚠️ 待修正 | 当前 Spring Boot **4.1.0 (RC)**，**必须降到 3.3.5 稳定版**（见 PITFALLS.md §1） |
-| 前端骨架 | 🟡 部分完成 | 30 个 `.vue` 页面壳（10 大模块 UI 已成型），但**缺 axios 拦截器、api/ 业务模块、路由守卫、Pinia 业务 store** |
-| 数据库 | ⬜ 未执行 | `guide/erp_schema.sql` 含 36 张表 DDL，待用 Flyway 迁移 |
-| 中间件 | ⬜ 未部署 | server3 上 MySQL/Redis/MinIO 均未安装 |
-| 文档 | ✅ 完整 | guide/ 下 4 份 MD 共 ~13 万字（**注意：guide/ 被 .gitignore 忽略，不进 git**） |
+| 后端骨架 | ✅ 完成 | 14 子模块 Maven 多模块工程，Spring Boot 3.3.5 LTS，编译/打包/启动正常 |
+| 数据库 | ✅ 完成 | Flyway 37 个迁移脚本已执行，MySQL 8 + Redis 7 已部署运行 |
+| 认证授权 | ✅ 完成 | JWT + Spring Security + 权限注解 `@PreAuthorize`，DB 登录端到端 |
+| 前端骨架 | ✅ 完成 | Vue 3 + Vite + TypeScript + Element Plus + Pinia，axios 拦截器、路由守卫、i18n 齐全 |
+| 系统管理 | ✅ 完成 | 用户/角色/部门/权限 CRUD，部门树，用户批量导入，权限绑定 |
+| 数据中心 | ✅ 完成 | 文件上传下载、定价分析、Excel 批量导入/模板下载 |
+| 工作台 | ✅ 完成 | 欢迎区、快捷入口、待办、通知、审批、数据概览、工作计划/日志 |
+| 工作报表 | ✅ 完成 | 工作计划（08:30-10:30 限时）+ 工作日志 + 管理界面 + 批量审批 |
+| 中间件 | 🟡 部分 | MySQL 8 + Redis 7 ✅，MinIO ❌（本地文件系统暂代） |
+| 文档 | ✅ 完整 | guide/ 下 4 份 MD + ROADMAP.md + PITFALLS.md（**application.yaml 已脱敏，真配置不进 git**） |
 
 ---
 
@@ -42,71 +47,79 @@
 
 ```
 erp-parent (pom)
-├── erp-common         基础公共：BaseEntity / R<T> / 异常 / 枚举
-├── erp-security       Spring Security + JWT + 权限注解
-├── erp-user           用户/角色/权限/部门（sys_*）
+├── erp-common         基础公共：BaseEntity / R<T> / 异常 / 枚举 / MinioTemplate
+├── erp-security       Spring Security + JWT + 权限注解 + @CurrentUser
+├── erp-user           用户/角色/权限/部门（sys_*）+ 部门-权限关联
 ├── erp-product        产品/分类/HS编码/多币种价格（prd_*）
 ├── erp-customer       客户/供应商（crm_*）
 ├── erp-order          销售单/采购单/状态流转（ord_*）— 核心模块
-├── erp-finance        汇率/应收/应付/结算/税务（fin_*）
-├── erp-approval       工作流/审批引擎（app_*）
+├── erp-finance        汇率/应收/应付/结算/资金审批/工作流（fin_* / app_*）
+├── erp-approval       工作流/审批引擎（预留，实际在 erp-finance 实现）
 ├── erp-logistics      物流跟踪（log_*）
 ├── erp-document       单证生成与版本（doc_*）
-├── erp-data           数据上传/定价分析（dat_*）
-├── erp-notification   通知中心（ntf_*）
-├── erp-dashboard      仪表盘聚合查询
-└── erp-web            启动入口 + 全局配置 + Flyway 迁移
+├── erp-data           数据上传/定价分析（dat_*）+ Excel 批量导入
+├── erp-notification   通知中心（ntf_*）+ 站内通知/未读/已读
+├── erp-report         报表导出 + 工作报表（工作计划/日志/审批）
+└── erp-web            启动入口 + 全局配置 + Flyway 迁移 + JacksonConfig
 ```
 
-### 前端模块（已存在的页面壳）
+### 前端模块（已联调完成的页面）
 
 ```
 erp-frontend/src/views/
-├── login/              ✓ 登录
-├── dashboard/          ✓ 仪表盘
-├── system/             ✓ 用户管理 + 角色管理
-├── product/            ✓ 产品列表
-├── customer/           ✓ 客户列表 + 供应商列表
-├── order/              ✓ 销售订单列表/创建 + 采购订单列表
-├── finance/            ✓ 财务总览 + 资金审批 + 汇率
-├── logistics/          ✓ 物流列表
-├── document/           ✓ 单证列表
-├── data/               ✓ 数据上传 + 定价分析
-├── approval/           ✓ 待我审批
-└── error/              ✓ 404
+├── login/              ✅ 登录（JWT + captcha + 自动重登）
+├── dashboard/          ✅ 个人工作台（欢迎/快捷入口/待办/通知/审批/统计/计划/日志）
+├── system/             ✅ 用户管理 + 角色管理 + 部门管理 + 权限管理
+├── product/            ✅ 产品列表
+├── customer/           ✅ 客户列表 + 供应商列表
+├── order/              ✅ 销售订单列表/创建 + 采购订单列表
+├── finance/            ✅ 财务总览 + 资金审批 + 汇率
+├── logistics/          ✅ 物流列表
+├── document/           ✅ 单证列表
+├── data/               ✅ 数据上传（支持下载）+ 定价分析（Excel 批量导入）
+├── approval/           ✅ 待我审批
+├── report/             ✅ 工作报表管理（合并显示/筛选/批量审批）
+└── error/              ✅ 404
 ```
 
-⚠️ **缺失目录**：`api/`、`utils/`（含 axios 拦截器）、按模块拆分的 Pinia store、路由守卫逻辑、i18n 配置。
+**前端基础设施**：`api/`（按模块拆分）、`utils/`（storage/format）、`types/`（TS 接口）、`store/`（Pinia userStore）、`router/`（路由守卫 + 权限过滤）、`components/`（DepartmentSelect 等复用组件）。
+**特性**：axios 拦截器（401 自动跳转）、vue-i18n 9、SCSS 主题、Element Plus 自动导入。
 
 ---
 
-## 🚀 运行方式（目标态，当前未启动）
+## 🚀 运行方式
 
 ### 前置依赖
-- JDK 17 LTS
-- Maven 3.9+（项目含 `mvnw`）
+- JDK 17 LTS（已安装于 `/opt/jdk/current`）
+- Maven 3.9+（或 `./mvnw`）
 - Node.js 20 LTS + pnpm
-- Docker（启动 MySQL + Redis + MinIO）
+- MySQL 8 + Redis 7（server3 已部署，systemd 管理）
 
-### 启动步骤
+### 后端启动
 ```bash
-# 1. 启动中间件（先在项目根创建 docker-compose.yml，见 DEV_GUIDE §12.3）
-docker compose up -d
+# 1. 编译打包
+cd /code/demo2
+mvn clean package -DskipTests
 
-# 2. 后端
-./mvnw clean compile
-./mvnw -pl erp-web spring-boot:run
-# 启动后 Flyway 自动迁移 36 张表
+# 2. 复制 jar 并启动（systemd 服务）
+cp erp-web/target/erp-web.jar /tmp/erp-web.jar
+systemctl restart erp-web.service
 
-# 3. 前端
-cd erp-frontend
+# 查看日志
+journalctl -u erp-web.service -f
+```
+
+### 前端启动
+```bash
+cd /code/demo2/erp-frontend
 pnpm install
 pnpm dev
-# 访问 http://localhost:5173
+# 访问 http://localhost:3000（Vite 代理 /api → localhost:8081）
 ```
 
 ### 默认登录
-- 待 `V1__init_system_tables.sql` 注入种子数据后确定
+- **admin / admin123**（系统管理员，拥有所有权限）
+- 登录后 JWT Token 有效期 30 分钟，Refresh Token 30 天
 
 ---
 
@@ -145,3 +158,7 @@ pnpm dev
 | 日期 | 变更 |
 |------|------|
 | 2026-06-24 | 项目文档骨架建立（README + ROADMAP + PITFALLS），基线现状盘点完成 |
+| 2026-06-24 | B0 完成：JDK17/Maven/14 子模块/编译验证 |
+| 2026-06-24 | B1 完成：MySQL 8 + Redis 7 + Flyway V1~V3 + JWT 认证 + 前端基建 |
+| 2026-06-25 | B1.6 完成：系统管理联调（用户/角色/部门/权限）+ 修复 `@ConditionalOnBean` 时序陷阱 |
+| 2026-06-26 | **优化阶段 3 完成**：工作台重构 + 数据下载/导入 + 工作报表管理 + ID 精度修复 + 软删除修复 + application.yaml 脱敏

@@ -255,6 +255,7 @@
 | 日期 | 变更 |
 |------|------|
 | 2026-06-24 | 文档骨架建立 + 已识别的 5 个开局陷阱 + CentOS 7 沿用经验 + 通用约束 |
+| 2026-06-26 | 追加 §31~§35：systemd 自动重启、雪花 ID 精度丢失、软删除唯一索引冲突、erp-report 缺 mybatis-plus 依赖、Vue el-table 类型推断 |
  
 ### 6. JDK 17 国内源大多 404，仅华为云 OpenJDK GA 可用（CentOS 7）
 
@@ -313,7 +314,151 @@ git commit -m "cleanup: 移除入库的旧包"
 **预防**：root-commit 之前先 `git status` 完整审查一遍，所有 `AD`/`AM` 行都要确认是想要的状态；移动目录后做一次 `git add -A`，让 git 同步检测删除。
 ---
 
-## §9 子 pom <description> 中包含 `<T>` 会让 XML 解析失败【B0.3】
+## §31. 旧 jar 包 systemd 自动重启导致代码修改不生效【优化阶段 1】
+
+### 现象
+- 修改 Java 代码后重新打包，复制到 `/tmp/erp-web.jar`，重启 systemd 服务
+- 接口行为仍然是旧的（比如删除后重建部门仍然报唯一索引冲突）
+- `systemctl restart erp-web.service` 后日志显示启动的 jar 路径不对
+
+### 根因
+server3 上存在 systemd 服务 `erp-web.service`，配置为：
+```ini
+ExecStart=/usr/bin/java -jar /tmp/erp-web.jar
+Restart=always
+```
+但 `/tmp/erp-web.jar` 在重启后可能被系统清理，或者复制时没覆盖成功。
+
+### 解法
+1. 确保 `/tmp/erp-web.jar` 确实被新包覆盖（`cp -f`）
+2. 或者修改 systemd 服务指向固定路径（如 `/opt/erp/erp-web.jar`）
+3. 重启后等待 10-15 秒再验证（Spring Boot 启动需要时间）
+
+### 验证
+```bash
+systemctl restart erp-web.service
+sleep 15
+journalctl -u erp-web.service --since "10 seconds ago" | tail -5
+# 应看到 "Started ErpApplication in Xs" 且版本号正确
+```
+
+**入坑日期**：2026-06-26（优化阶段 1）
+
+---
+
+## §32. 雪花 ID 精度丢失：Java Long 超出 JS MAX_SAFE_INTEGER【优化阶段 1】
+
+### 现象
+- 后端生成的 Snowflake ID（如 `2070199920249511938`）传给前端后，最后几位变成 0
+- 前端删除部门后再创建同名部门，报唯一索引冲突（因为删除时传的 ID 是错的）
+- 前端表格中 ID 显示为 `2070199920249512000`（精度丢失）
+
+### 根因
+JavaScript `Number.MAX_SAFE_INTEGER = 9007199254740991`（约 16 位），而 Snowflake ID 是 19 位。JSON 解析时 `2070199920249511938` 被截断为 `2070199920249512000`。
+
+### 解法
+全局 Jackson 配置将所有 `Long` 序列化为 `String`：
+```java
+@Bean
+public Jackson2ObjectMapperBuilderCustomizer longToStringCustomizer() {
+    return builder -> {
+        builder.serializerByType(Long.class, ToStringSerializer.instance);
+        builder.serializerByType(Long.TYPE, ToStringSerializer.instance);
+    };
+}
+```
+
+前端统一类型：
+```typescript
+export type Id = string | number;
+```
+
+### 验证
+- 后端返回 `"userId": "2070199920249511938"`（带引号的字符串）✅
+- 前端删除/更新操作使用正确 ID ✅
+- 不再出现"删除后重建报唯一索引冲突"✅
+
+**入坑日期**：2026-06-26（优化阶段 1）
+
+---
+
+## §33. 软删除 + 唯一索引冲突：删除后无法重建同名记录【优化阶段 1】
+
+### 现象
+- 删除部门（逻辑删除 `deleted=1`）后，再创建同名部门报 `Duplicate entry 'xxx' for key 'dept_code'`
+- 前端无法删除"数据部"这个旧部门（精度丢失导致删除的是错误记录）
+
+### 根因
+MySQL 唯一索引 `UNIQUE INDEX uk_dept_code (dept_code)` 不考虑 `deleted` 字段，所以即使记录被逻辑删除，`dept_code` 仍然占用。
+
+### 解法
+改为复合唯一索引：
+```sql
+ALTER TABLE sys_department DROP INDEX dept_code;
+ALTER TABLE sys_department ADD UNIQUE INDEX uk_dept_code_deleted (dept_code, deleted);
+```
+这样 `(dept_code='数据部', deleted=0)` 和 `(dept_code='数据部', deleted=1)` 可以同时存在。
+
+### 验证
+- 删除部门后再创建同名部门 ✅
+- 已删除的部门代码不冲突 ✅
+
+**入坑日期**：2026-06-26（优化阶段 1）
+
+---
+
+## §34. erp-report 模块缺 mybatis-plus 依赖导致编译失败【工作报表开发】
+
+### 现象
+新建 `RptWorkPlanMapper` / `RptWorkLogMapper`（继承 `BaseMapper`）后编译报错：
+```
+package com.baomidou.mybatisplus.core.mapper does not exist
+```
+
+### 根因
+`erp-report/pom.xml` 原有依赖只有 `erp-common`、`erp-security`、`erp-order`、`erp-finance`、`easyexcel`，没有 MyBatis-Plus starter。
+
+### 解法
+```xml
+<dependency>
+    <groupId>com.baomidou</groupId>
+    <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+</dependency>
+```
+注意 artifactId 是 `mybatis-plus-spring-boot3-starter`（不是 `mybatis-plus-boot-starter`，后者是 SB2 的）。
+
+**入坑日期**：2026-06-26（工作报表开发）
+
+---
+
+## §35. Vue el-table 行类型推断失败导致 TypeScript 报错【前端】
+
+### 现象
+`WorkReportManage.vue` 中使用 `<template #default="{ row }">` 访问 `row.planId` 时，TypeScript 报错：
+```
+Type 'DefaultRow' is missing the following properties from type 'WorkReportVO'
+```
+
+### 根因
+Element Plus 的 `el-table` 默认行类型是 `DefaultRow`，与自定义的 `WorkReportVO` 不匹配。
+
+### 解法
+方案 A：显式声明 `data` 泛型（推荐）：
+```vue
+<el-table :data="records" :row-key="(row: WorkReportVO) => row.userId">
+```
+
+方案 B：slot 中用 `any` 然后手动断言（简单场景）：
+```vue
+<template #default="{ row }: any">
+  <div @click="showDetail(row as WorkReportVO, 'plan')">
+```
+
+**入坑日期**：2026-06-26（工作报表管理界面开发）
+
+---
+
+## §36. `@ConditionalOnBean(DataSource.class)` 时序陷阱 ❌
 
 **症状**：执行 `mvn clean compile` 在第一个子模块就报 `Non-parseable POM`：
 ```
