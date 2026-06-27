@@ -9,11 +9,15 @@ import com.erp.data.dto.DataUploadPageVO;
 import com.erp.data.dto.DataUploadQuery;
 import com.erp.data.dto.DataUploadVO;
 import com.erp.data.entity.DatUpload;
+import com.erp.data.entity.DatUploadDeptShare;
+import com.erp.data.mapper.DatUploadDeptShareMapper;
 import com.erp.data.mapper.DatUploadMapper;
 import com.erp.data.service.DatUploadService;
+import com.erp.security.user.LoginUser;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,21 +34,23 @@ import java.util.stream.Collectors;
 
 @Service
 public class DatUploadServiceImpl implements DatUploadService {
-    /** 上传文件存储根目录，默认相对工作目录 ./uploads/data，可由配置 app.upload.data-root 覆盖。 */
     private final Path uploadRoot;
-
     private final DatUploadMapper mapper;
+    private final DatUploadDeptShareMapper shareMapper;
     private final JdbcTemplate jdbcTemplate;
 
     public DatUploadServiceImpl(@Value("${app.upload.data-root:./uploads/data}") String dataRoot,
                                 DatUploadMapper mapper,
+                                DatUploadDeptShareMapper shareMapper,
                                 JdbcTemplate jdbcTemplate) {
         this.uploadRoot = Path.of(dataRoot).toAbsolutePath().normalize();
         this.mapper = mapper;
+        this.shareMapper = shareMapper;
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    /** 批量查询用户 ID → 用户名映射（只查 sys_user，避免与 erp-user 模块循环依赖）。 */
+    // ==================== 辅助方法 ====================
+
     private Map<Long, String> loadUserNames(Collection<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) return Collections.emptyMap();
         String inClause = userIds.stream().map(String::valueOf).collect(Collectors.joining(","));
@@ -60,10 +66,51 @@ public class DatUploadServiceImpl implements DatUploadService {
         return result;
     }
 
+    /** 查询某部门及其所有下级部门 ID（含自身），基于 dept_path 前缀匹配。 */
+    private List<Long> getDeptAndDescendantIds(Long deptId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT id FROM sys_department WHERE dept_path LIKE CONCAT((SELECT dept_path FROM sys_department WHERE id = ?), '%') AND deleted = 0",
+            deptId);
+        return rows.stream().map(r -> ((Number) r.get("id")).longValue()).collect(Collectors.toList());
+    }
+
+    /** 批量加载共享部门 ID → 部门名映射。 */
+    private Map<Long, String> loadDeptNames(Collection<Long> deptIds) {
+        if (deptIds == null || deptIds.isEmpty()) return Collections.emptyMap();
+        String inClause = deptIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT id, dept_name FROM sys_department WHERE id IN (" + inClause + ")");
+        Map<Long, String> result = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            result.put(((Number) row.get("id")).longValue(), (String) row.get("dept_name"));
+        }
+        return result;
+    }
+
+    // ==================== 查询 ====================
+
     @Override
-    public DataUploadPageVO listPage(DataUploadQuery q) {
+    public DataUploadPageVO listPage(DataUploadQuery q, LoginUser user) {
         LambdaQueryWrapper<DatUpload> w = new LambdaQueryWrapper<>();
         w.eq(DatUpload::getDeleted, 0);
+
+        // 部门层级隔离 + 共享部门可见
+        boolean isAdmin = user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN");
+        if (!isAdmin && user.getId() != null) {
+            // 自己上传的 OR 部门层级可见 OR 共享部门可见
+            List<Long> visibleDeptIds = new ArrayList<>();
+            if (user.getDepartmentId() != null) {
+                visibleDeptIds.addAll(getDeptAndDescendantIds(user.getDepartmentId()));
+            }
+            if (!visibleDeptIds.isEmpty()) {
+                String deptIdStr = visibleDeptIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+                w.and(i -> i.eq(DatUpload::getCreatedBy, user.getId())
+                    .or().in(DatUpload::getDeptId, visibleDeptIds)
+                    .or().apply("EXISTS (SELECT 1 FROM dat_upload_dept_share s WHERE s.upload_id = id AND s.dept_id IN (" + deptIdStr + "))"));
+            } else {
+                w.eq(DatUpload::getCreatedBy, user.getId());
+            }
+        }
 
         if (q.getKeyword() != null && !q.getKeyword().isEmpty()) {
             w.like(DatUpload::getFileName, q.getKeyword());
@@ -92,24 +139,32 @@ public class DatUploadServiceImpl implements DatUploadService {
         return vo;
     }
 
+    // ==================== 上传 ====================
+
     @Override
-    public Long upload(String fileName, String fileType, Long fileSize, String department, Long userId) {
+    @Transactional(rollbackFor = Exception.class)
+    public Long upload(String fileName, String fileType, Long fileSize, String department,
+                        Long userId, Long deptId, List<Long> shareDeptIds) {
         DatUpload e = new DatUpload();
         e.setFileName(fileName);
         e.setFileType(fileType);
         e.setOriginalName(fileName);
         e.setFileSize(fileSize);
         e.setDepartment(department);
+        e.setDeptId(deptId);
         e.setRowCount(0);
         e.setParsed(false);
         e.setUploadType("manual");
         if (userId != null && userId > 0) e.setCreatedBy(userId);
         mapper.insert(e);
+        saveShareDepts(e.getId(), shareDeptIds);
         return e.getId();
     }
 
     @Override
-    public Long uploadFile(MultipartFile file, String fileType, String department, Long userId) {
+    @Transactional(rollbackFor = Exception.class)
+    public Long uploadFile(MultipartFile file, String fileType, String department,
+                            Long userId, Long deptId, List<Long> shareDeptIds) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("请选择要上传的文件");
         }
@@ -137,17 +192,31 @@ public class DatUploadServiceImpl implements DatUploadService {
         e.setFileSize(file.getSize());
         e.setFilePath(target.toString());
         e.setDepartment(department);
+        e.setDeptId(deptId);
         e.setRowCount(0);
         e.setParsed(false);
         e.setUploadType("file");
         if (userId != null && userId > 0) e.setCreatedBy(userId);
         mapper.insert(e);
+        saveShareDepts(e.getId(), shareDeptIds);
         return e.getId();
     }
 
-    /**
-     * 逻辑删除：只标记 dat_upload.deleted=1，不删除磁盘文件，便于审计/回滚。
-     */
+    /** 保存共享部门记录（覆盖式）。 */
+    private void saveShareDepts(Long uploadId, List<Long> shareDeptIds) {
+        if (shareDeptIds != null && !shareDeptIds.isEmpty()) {
+            for (Long sid : shareDeptIds) {
+                if (sid == null) continue;
+                DatUploadDeptShare s = new DatUploadDeptShare();
+                s.setUploadId(uploadId);
+                s.setDeptId(sid);
+                shareMapper.insert(s);
+            }
+        }
+    }
+
+    // ==================== 删除 / 下载 ====================
+
     @Override
     public void delete(Long id) {
         int updated = mapper.update(null, new LambdaUpdateWrapper<DatUpload>()
@@ -187,6 +256,8 @@ public class DatUploadServiceImpl implements DatUploadService {
         }
     }
 
+    // ==================== VO 转换 ====================
+
     private DataUploadVO toVO(DatUpload e) {
         if (e == null) return null;
         DataUploadVO v = new DataUploadVO();
@@ -197,11 +268,22 @@ public class DatUploadServiceImpl implements DatUploadService {
         v.setFileSize(e.getFileSize());
         v.setFilePath(e.getFilePath());
         v.setDepartment(e.getDepartment());
+        v.setDeptId(e.getDeptId());
         v.setRowCount(e.getRowCount());
         v.setParsed(e.getParsed());
         v.setRemark(e.getRemark());
         v.setCreatedBy(e.getCreatedBy());
         v.setCreatedAt(e.getCreatedAt());
+
+        // 加载共享部门信息
+        if (e.getId() != null) {
+            List<Long> shareIds = shareMapper.selectDeptIdsByUploadId(e.getId());
+            v.setShareDeptIds(shareIds);
+            if (!shareIds.isEmpty()) {
+                Map<Long, String> nameMap = loadDeptNames(shareIds);
+                v.setShareDeptNames(shareIds.stream().map(nameMap::get).filter(Objects::nonNull).collect(Collectors.toList()));
+            }
+        }
         return v;
     }
 }

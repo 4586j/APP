@@ -36,7 +36,7 @@ public class MysqlUserDetailsLoader implements UserDetailsLoader {
         List<String> permissions = userService.getPermissionsByUserId(u.getId());
         log.info("loaded user {}: roles={}, perms={}", username, roles.size(), permissions.size());
         return new LoginUser(u.getId(), u.getUsername(), u.getPasswordHash(),
-            u.getRealName(), deptCode, deptName, roles, permissions);
+            u.getRealName(), deptCode, deptName, dept != null ? dept.getId() : null, roles, permissions);
     }
     @Override public void updatePassword(String username, String encryptedPassword) {
         userService.updatePassword(username, encryptedPassword);

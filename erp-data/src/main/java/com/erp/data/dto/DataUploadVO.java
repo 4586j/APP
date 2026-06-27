@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class DataUploadVO {
@@ -17,6 +18,10 @@ public class DataUploadVO {
     private String filePath;
     private String uploadType;
     private String department;
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long deptId;
+    private List<Long> shareDeptIds;
+    private List<String> shareDeptNames;
     private Integer rowCount;
     private Boolean parsed;
     private String remark;

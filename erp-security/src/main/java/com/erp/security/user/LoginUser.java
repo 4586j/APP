@@ -44,6 +44,9 @@ public class LoginUser implements Serializable {
     /** 部门显示名。 */
     private String departmentName;
 
+    /** 部门ID。 */
+    private Long departmentId;
+
     /** 角色编码列表，例如 ROLE_ADMIN。 */
     private List<String> roles;
 

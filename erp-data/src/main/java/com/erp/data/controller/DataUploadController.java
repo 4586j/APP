@@ -10,15 +10,11 @@ import com.erp.security.user.LoginUser;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/data/uploads")
@@ -28,8 +24,8 @@ public class DataUploadController {
     private final DatUploadService service;
 
     @GetMapping
-    public R<DataUploadPageVO> list(DataUploadQuery q) {
-        return R.ok(service.listPage(q));
+    public R<DataUploadPageVO> list(DataUploadQuery q, @CurrentUser LoginUser user) {
+        return R.ok(service.listPage(q, user));
     }
 
     @GetMapping("/{id}")
@@ -54,8 +50,11 @@ public class DataUploadController {
     public R<Long> uploadFile(@RequestParam("file") MultipartFile file,
                               @RequestParam String fileType,
                               @RequestParam(required = false) String department,
+                              @RequestParam(required = false) Long deptId,
+                              @RequestParam(required = false) String shareDeptIds,
                               @CurrentUser LoginUser user) {
-        return R.ok(service.uploadFile(file, fileType, department, user.getId()));
+        List<Long> ids = parseShareDeptIds(shareDeptIds);
+        return R.ok(service.uploadFile(file, fileType, department, user.getId(), deptId, ids));
     }
 
     /**
@@ -67,8 +66,18 @@ public class DataUploadController {
                           @RequestParam String fileType,
                           @RequestParam(required = false) Long fileSize,
                           @RequestParam(required = false) String department,
+                          @RequestParam(required = false) Long deptId,
+                          @RequestParam(required = false) String shareDeptIds,
                           @CurrentUser LoginUser user) {
-        return R.ok(service.upload(fileName, fileType, fileSize != null ? fileSize : 0L, department, user.getId()));
+        List<Long> ids = parseShareDeptIds(shareDeptIds);
+        return R.ok(service.upload(fileName, fileType, fileSize != null ? fileSize : 0L, department, user.getId(), deptId, ids));
+    }
+
+    /** 解析逗号分隔的共享部门 ID 字符串为列表。 */
+    private List<Long> parseShareDeptIds(String shareDeptIds) {
+        if (shareDeptIds == null || shareDeptIds.isBlank()) return List.of();
+        return java.util.Arrays.stream(shareDeptIds.split(","))
+            .map(String::trim).filter(s -> !s.isEmpty()).map(Long::valueOf).collect(java.util.stream.Collectors.toList());
     }
 
     @DeleteMapping("/{id}")
