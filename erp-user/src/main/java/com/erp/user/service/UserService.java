@@ -9,7 +9,7 @@ public interface UserService {
     SysUser loadByUsername(String username);
     List<String> getRolesByUserId(Long userId);
     List<String> getPermissionsByUserId(Long userId);
-    Page<?> pageUsers(UserQuery query);
+    Page<UserVO> pageUsers(UserQuery query);
     UserVO getUserById(Long id);
     Long createUser(UserCreateRequest req);
     void updateUser(Long id, UserUpdateRequest req);

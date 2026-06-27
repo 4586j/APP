@@ -94,7 +94,7 @@ public class UserServiceImpl implements UserService {
         return new ArrayList<>(perms);
     }
 
-    @Override public Page<?> pageUsers(UserQuery query) {
+    @Override public Page<UserVO> pageUsers(UserQuery query) {
         Page<SysUser> page = new Page<>(query.getPage(), Math.min(query.getSize(), 100));
         LambdaQueryWrapper<SysUser> w = new LambdaQueryWrapper<>();
         if (query.getUsername() != null) w.like(SysUser::getUsername, query.getUsername());
@@ -124,7 +124,62 @@ public class UserServiceImpl implements UserService {
         }
 
         w.orderByDesc(SysUser::getCreatedAt);
-        return userMapper.selectPage(page, w);
+        Page<SysUser> raw = userMapper.selectPage(page, w);
+        List<SysUser> list = raw.getRecords();
+        if (list.isEmpty()) {
+            Page<UserVO> empty = new Page<>(raw.getCurrent(), raw.getSize(), raw.getTotal());
+            empty.setRecords(Collections.emptyList());
+            return empty;
+        }
+
+        // 批量查询部门名称
+        Set<Long> deptIds = list.stream().map(SysUser::getDepartmentId)
+            .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> deptNameMap = deptIds.isEmpty() ? Collections.emptyMap()
+            : departmentMapper.selectBatchIds(deptIds).stream()
+                .collect(Collectors.toMap(SysDepartment::getId, SysDepartment::getName));
+
+        // 批量查询用户-角色关联（userId -> roleIds）
+        List<Long> userIds = list.stream().map(SysUser::getId).collect(Collectors.toList());
+        List<SysUserRole> urs = userRoleMapper.selectList(
+            new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId, userIds));
+        Map<Long, List<Long>> userRoleMap = urs.stream().collect(
+            Collectors.groupingBy(SysUserRole::getUserId,
+                Collectors.mapping(SysUserRole::getRoleId, Collectors.toList())));
+
+        // 批量查询角色编码（roleId -> roleCode）
+        Set<Long> roleIds = urs.stream().map(SysUserRole::getRoleId).collect(Collectors.toSet());
+        Map<Long, String> roleCodeMap = roleIds.isEmpty() ? Collections.emptyMap()
+            : roleMapper.selectBatchIds(roleIds).stream()
+                .collect(Collectors.toMap(SysRole::getId, SysRole::getRoleCode));
+
+        List<UserVO> voList = list.stream().map(u -> {
+            List<Long> rids = userRoleMap.getOrDefault(u.getId(), Collections.emptyList());
+            List<String> codes = rids.stream()
+                .map(roleCodeMap::get).filter(Objects::nonNull).collect(Collectors.toList());
+            return UserVO.builder()
+                .id(u.getId())
+                .username(u.getUsername())
+                .realName(u.getRealName())
+                .email(u.getEmail())
+                .phone(u.getPhone())
+                .avatarUrl(u.getAvatarUrl())
+                .departmentId(u.getDepartmentId())
+                .departmentName(u.getDepartmentId() == null ? null : deptNameMap.get(u.getDepartmentId()))
+                .superiorId(u.getSuperiorId())
+                .status(u.getStatus())
+                .pwdResetRequired(u.getPwdResetRequired())
+                .lastLoginTime(u.getLastLoginTime())
+                .lastLoginIp(u.getLastLoginIp())
+                .lockedUntil(u.getLockedUntil())
+                .createdAt(u.getCreatedAt())
+                .roleIds(rids)
+                .roleCodes(codes)
+                .build();
+        }).collect(Collectors.toList());
+        Page<UserVO> result = new Page<>(raw.getCurrent(), raw.getSize(), raw.getTotal());
+        result.setRecords(voList);
+        return result;
     }
 
     @Override public UserVO getUserById(Long id) {

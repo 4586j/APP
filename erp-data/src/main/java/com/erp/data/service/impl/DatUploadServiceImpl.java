@@ -11,7 +11,7 @@ import com.erp.data.dto.DataUploadVO;
 import com.erp.data.entity.DatUpload;
 import com.erp.data.mapper.DatUploadMapper;
 import com.erp.data.service.DatUploadService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,11 +28,17 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class DatUploadServiceImpl implements DatUploadService {
-    private static final Path UPLOAD_ROOT = Path.of("/code/demo2/uploads/data");
+    /** 上传文件存储根目录，默认相对工作目录 ./uploads/data，可由配置 app.upload.data-root 覆盖。 */
+    private final Path uploadRoot;
 
     private final DatUploadMapper mapper;
+
+    public DatUploadServiceImpl(@Value("${app.upload.data-root:./uploads/data}") String dataRoot,
+                                DatUploadMapper mapper) {
+        this.uploadRoot = Path.of(dataRoot).toAbsolutePath().normalize();
+        this.mapper = mapper;
+    }
 
     @Override
     public DataUploadPageVO listPage(DataUploadQuery q) {
@@ -82,7 +88,7 @@ public class DatUploadServiceImpl implements DatUploadService {
         if (dot >= 0) {
             suffix = safeName.substring(dot);
         }
-        Path dayDir = UPLOAD_ROOT.resolve(LocalDate.now().toString());
+        Path dayDir = uploadRoot.resolve(LocalDate.now().toString());
         String storedName = UUID.randomUUID() + suffix;
         Path target = dayDir.resolve(storedName).normalize();
         try {
