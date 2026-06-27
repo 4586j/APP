@@ -101,6 +101,15 @@
                   配置权限
                 </el-button>
                 <el-button
+                  v-if="hasPerm('department:update')"
+                  type="primary"
+                  link
+                  size="small"
+                  @click="openUserPermDialog(row)"
+                >
+                  用户权限
+                </el-button>
+                <el-button
                   v-if="hasPerm('department:delete')"
                   type="danger"
                   link
@@ -209,6 +218,58 @@
         <el-button type="primary" :loading="permSaving" @click="savePermDialog">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 用户权限配置弹窗 -->
+    <el-dialog v-model="userPermDialogVisible" title="用户权限配置" width="620px" @closed="resetUserPermDialog">
+      <p style="color:#606266;margin-bottom:12px">
+        当前部门：<strong>{{ userPermDialogDeptName }}</strong>
+      </p>
+      <p style="color:#909399;font-size:13px;margin-bottom:16px">
+        为部门内的用户分配具体权限，仅对部员/部长生效（管理员拥有所有权限）
+      </p>
+
+      <el-table :data="deptUsers" stripe size="small" max-height="300" v-loading="userLoading">
+        <el-table-column prop="realName" label="姓名" width="120" />
+        <el-table-column prop="username" label="用户名" width="130" />
+        <el-table-column prop="roleCodes" label="职称" width="120">
+          <template #default="{ row }">
+            <el-tag size="small">{{ row.roleCodes?.[0] === 'ROLE_ADMIN' ? '管理员' : row.roleCodes?.[0] === 'ROLE_N002' ? '部长' : '部员' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" :disabled="row.roleCodes?.includes('ROLE_ADMIN')" @click="editUserPerm(row)">
+              配置权限
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
+    <!-- 单个用户权限编辑弹窗 -->
+    <el-dialog v-model="singleUserPermVisible" :title="'权限配置 - ' + singleUserPermUser?.realName" width="500px" @closed="resetSingleUserPerm">
+      <el-tree
+        ref="userPermTreeRef"
+        :data="permTree"
+        show-checkbox
+        node-key="id"
+        default-expand-all
+        :props="{ label: 'name', children: 'children' }"
+        style="max-height:420px;overflow-y:auto"
+      >
+        <template #default="{ data }">
+          <span>
+            {{ data.name }}
+            <el-tag size="small" style="margin-left:6px">{{ data.code }}</el-tag>
+            <el-tag v-if="data.type === 'button'" type="warning" size="small" style="margin-left:4px">按钮</el-tag>
+          </span>
+        </template>
+      </el-tree>
+      <template #footer>
+        <el-button @click="singleUserPermVisible = false">取消</el-button>
+        <el-button type="primary" :loading="userPermSaving" @click="saveUserPerm">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -224,9 +285,13 @@ import {
   listPermissionTree,
   getDeptPermissionIds,
   assignDeptPermissions,
+  getDeptUserPermissionIds,
+  assignDeptUserPermissions,
+  listUsers,
   type DepartmentNode,
   type PermissionNode,
   type Id,
+  type SystemUser,
 } from '@/api/system'
 import { useUserStore } from '@/store/user'
 
@@ -466,6 +531,79 @@ async function savePermDialog() {
     permDialogVisible.value = false
   } finally {
     permSaving.value = false
+  }
+}
+
+// 用户权限配置弹窗
+const userPermDialogVisible = ref(false)
+const userPermDialogDeptId = ref<Id | undefined>(undefined)
+const userPermDialogDeptName = ref('')
+const deptUsers = ref<SystemUser[]>([])
+const userLoading = ref(false)
+
+async function openUserPermDialog(row: any) {
+  userPermDialogDeptId.value = row.id
+  userPermDialogDeptName.value = row.name
+  userPermDialogVisible.value = true
+  await loadPermTreeIfNeeded()
+  await loadDeptUsers(row.id)
+}
+
+async function loadDeptUsers(deptId: Id) {
+  userLoading.value = true
+  try {
+    const res = await listUsers({ pageNum: 1, pageSize: 999, departmentId: deptId })
+    deptUsers.value = (res as any).records || []
+  } catch (e: any) {
+    console.error('Failed to load dept users:', e)
+    ElMessage.error('加载用户列表失败')
+  } finally {
+    userLoading.value = false
+  }
+}
+
+function resetUserPermDialog() {
+  userPermDialogDeptId.value = undefined
+  userPermDialogDeptName.value = ''
+  deptUsers.value = []
+}
+
+// 单个用户权限编辑
+const singleUserPermVisible = ref(false)
+const singleUserPermUser = ref<any>(null)
+const userPermTreeRef = ref<any>()
+const userPermSaving = ref(false)
+
+async function editUserPerm(row: any) {
+  singleUserPermUser.value = row
+  singleUserPermVisible.value = true
+  setTimeout(async () => {
+    try {
+      const ids = await getDeptUserPermissionIds(userPermDialogDeptId.value!, row.id)
+      userPermTreeRef.value?.setCheckedKeys(ids || [])
+    } catch (e) {
+      console.error('Failed to load user permissions:', e)
+    }
+  }, 100)
+}
+
+function resetSingleUserPerm() {
+  singleUserPermUser.value = null
+  userPermTreeRef.value?.setCheckedKeys([])
+}
+
+async function saveUserPerm() {
+  if (!singleUserPermUser.value || !userPermDialogDeptId.value) return
+  userPermSaving.value = true
+  try {
+    const checked = userPermTreeRef.value?.getCheckedKeys(false) || []
+    const halfChecked = userPermTreeRef.value?.getHalfCheckedKeys?.() || []
+    const permIds = Array.from(new Set([...checked, ...halfChecked]))
+    await assignDeptUserPermissions(userPermDialogDeptId.value, singleUserPermUser.value.id, permIds)
+    ElMessage.success('用户权限已保存')
+    singleUserPermVisible.value = false
+  } finally {
+    userPermSaving.value = false
   }
 }
 

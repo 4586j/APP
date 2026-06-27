@@ -40,6 +40,7 @@ public class UserServiceImpl implements UserService {
     private final SysPermissionMapper permissionMapper;
     private final SysDepartmentMapper departmentMapper;
     private final SysDepartmentPermissionMapper deptPermMapper;
+    private final com.erp.user.mapper.SysDeptUserPermissionMapper deptUserPermMapper;
     private final PasswordEncoder passwordEncoder;
     private final StringRedisTemplate redisTemplate;
 
@@ -84,14 +85,17 @@ public class UserServiceImpl implements UserService {
     }
     @Override public List<String> getRolesByUserId(Long userId) { return roleMapper.selectRolesByUserId(userId); }
     @Override public List<String> getPermissionsByUserId(Long userId) {
-        // 角色权限
-        Set<String> perms = new HashSet<>(permissionMapper.selectPermissionsByUserId(userId));
-        // 部门权限（用户所在部门赋予的权限）
-        SysUser u = userMapper.selectById(userId);
-        if (u != null && u.getDepartmentId() != null) {
-            perms.addAll(permissionMapper.selectPermissionsByDeptId(u.getDepartmentId()));
+        // 获取用户角色列表
+        List<String> roles = getRolesByUserId(userId);
+        boolean isAdmin = roles != null && roles.contains("ROLE_ADMIN");
+
+        if (isAdmin) {
+            // 管理员：从角色权限表获取所有权限
+            return new ArrayList<>(new HashSet<>(permissionMapper.selectPermissionsByUserId(userId)));
         }
-        return new ArrayList<>(perms);
+
+        // 非管理员（部长/部员）：从部门用户权限表获取权限
+        return deptUserPermMapper.selectPermissionCodesByUserId(userId);
     }
 
     @Override public Page<UserVO> pageUsers(UserQuery query) {

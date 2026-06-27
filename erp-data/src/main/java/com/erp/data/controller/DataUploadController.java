@@ -28,8 +28,8 @@ public class DataUploadController {
     private final DatUploadService service;
 
     @GetMapping
-    public R<DataUploadPageVO> list(DataUploadQuery q, @CurrentUser LoginUser user) {
-        return R.ok(service.listPage(q, user));
+    public R<DataUploadPageVO> list(DataUploadQuery q) {
+        return R.ok(service.listPage(q));
     }
 
     @GetMapping("/{id}")

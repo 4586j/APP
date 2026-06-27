@@ -61,23 +61,9 @@ public class DatUploadServiceImpl implements DatUploadService {
     }
 
     @Override
-    public DataUploadPageVO listPage(DataUploadQuery q, com.erp.security.user.LoginUser user) {
+    public DataUploadPageVO listPage(DataUploadQuery q) {
         LambdaQueryWrapper<DatUpload> w = new LambdaQueryWrapper<>();
         w.eq(DatUpload::getDeleted, 0);
-
-        // 部门数据隔离：普通用户只能看到共享给自己部门或自己上传的文件；
-        // 管理员（ROLE_ADMIN）看全部。
-        boolean isAdmin = user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN");
-        if (!isAdmin) {
-            String deptName = user.getDepartmentName();
-            Long userId = user.getId();
-            if (deptName != null && userId != null) {
-                w.and(i -> i.eq(DatUpload::getDepartment, deptName)
-                    .or().eq(DatUpload::getCreatedBy, userId));
-            } else if (userId != null) {
-                w.eq(DatUpload::getCreatedBy, userId);
-            }
-        }
 
         if (q.getKeyword() != null && !q.getKeyword().isEmpty()) {
             w.like(DatUpload::getFileName, q.getKeyword());

@@ -292,3 +292,13 @@ export function getDeptPermissionIds(id: Id) {
 export function assignDeptPermissions(id: Id, permissionIds: Id[]) {
   return put<void>(`/system/departments/${id}/permissions`, { permissionIds })
 }
+
+/** 获取某部门下某用户的权限 ID 列表。 */
+export function getDeptUserPermissionIds(deptId: Id, userId: Id) {
+  return get<Id[]>(`/system/departments/${deptId}/users/${userId}/permissions`)
+}
+
+/** 为某部门下的用户分配权限（覆盖式）。 */
+export function assignDeptUserPermissions(deptId: Id, userId: Id, permissionIds: Id[]) {
+  return put<void>(`/system/departments/${deptId}/users/${userId}/permissions`, { permissionIds })
+}
