@@ -155,8 +155,15 @@
     <!-- 文件夹上传进度 -->
     <el-dialog v-model="showFolderUploadDialog" title="上传文件夹" width="480px" :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false">
       <div style="text-align:center;padding:20px">
-        <el-progress :percentage="folderUploadPercent" :stroke-width="20" :striped="true" :striped-flow="true" />
-        <p style="margin-top:10px;color:#606266">{{ folderUploadProgress }}</p>
+        <div style="margin-bottom:16px;text-align:left">
+          <div style="font-size:13px;color:#909399;margin-bottom:4px">当前文件进度</div>
+          <el-progress :percentage="folderCurrentPercent" :stroke-width="16" :striped="true" />
+        </div>
+        <div style="margin-bottom:16px;text-align:left">
+          <div style="font-size:13px;color:#909399;margin-bottom:4px">总体进度</div>
+          <el-progress :percentage="folderUploadPercent" :stroke-width="16" :striped="true" :striped-flow="true" />
+        </div>
+        <p style="margin-top:10px;color:#606266;font-size:13px">{{ folderUploadProgress }}</p>
       </div>
     </el-dialog>
   </div>
@@ -369,6 +376,7 @@ const uploadRef = ref<UploadInstance>()
 const uploadingFolder = ref(false)
 const folderUploadProgress = ref('')
 const folderUploadPercent = ref(0)
+const folderCurrentPercent = ref(0)
 const showFolderUploadDialog = ref(false)
 
 function triggerFolderUpload() {
@@ -389,6 +397,7 @@ async function onFolderSelected(event: Event) {
   showFolderUploadDialog.value = true
   uploadingFolder.value = true
   folderUploadPercent.value = 0
+  folderCurrentPercent.value = 0
   folderUploadProgress.value = '正在创建目录结构...'
 
   try {
@@ -429,8 +438,11 @@ async function onFolderSelected(event: Event) {
       const targetParentId = dirPath ? dirMap.get(dirPath) : currentParentId.value
 
       folderUploadProgress.value = `正在上传: ${relPath}`
+      folderCurrentPercent.value = 0
       try {
-        await uploadFileToNetdisk(file, targetParentId, undefined, undefined, shareIds)
+        await uploadFileToNetdisk(file, targetParentId, undefined, undefined, shareIds,
+          (p) => { folderCurrentPercent.value = p }
+        )
       } catch (e: any) {
         console.error(`上传失败: ${relPath}`, e)
       }
