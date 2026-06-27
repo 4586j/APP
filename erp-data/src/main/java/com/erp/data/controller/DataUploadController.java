@@ -5,6 +5,8 @@ import com.erp.data.dto.DataUploadPageVO;
 import com.erp.data.dto.DataUploadQuery;
 import com.erp.data.dto.DataUploadVO;
 import com.erp.data.service.DatUploadService;
+import com.erp.security.annotation.CurrentUser;
+import com.erp.security.user.LoginUser;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -48,24 +50,29 @@ public class DataUploadController {
      * 真实文件上传：前端选择本机文件后以 multipart/form-data 提交。
      */
     @PostMapping(consumes = "multipart/form-data")
+    @PreAuthorize("hasAuthority('data:upload:create')")
     public R<Long> uploadFile(@RequestParam("file") MultipartFile file,
                               @RequestParam String fileType,
-                              @RequestParam(required = false) String department) {
-        return R.ok(service.uploadFile(file, fileType, department));
+                              @RequestParam(required = false) String department,
+                              @CurrentUser LoginUser user) {
+        return R.ok(service.uploadFile(file, fileType, department, user.getId()));
     }
 
     /**
      * 兼容旧接口/自动化脚本：只写上传元数据，不保存实体文件。
      */
     @PostMapping(consumes = "application/x-www-form-urlencoded")
+    @PreAuthorize("hasAuthority('data:upload:create')")
     public R<Long> create(@RequestParam String fileName,
                           @RequestParam String fileType,
                           @RequestParam(required = false) Long fileSize,
-                          @RequestParam(required = false) String department) {
-        return R.ok(service.upload(fileName, fileType, fileSize != null ? fileSize : 0L, department));
+                          @RequestParam(required = false) String department,
+                          @CurrentUser LoginUser user) {
+        return R.ok(service.upload(fileName, fileType, fileSize != null ? fileSize : 0L, department, user.getId()));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('data:upload:delete')")
     public R<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return R.ok();

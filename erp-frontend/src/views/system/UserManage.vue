@@ -518,9 +518,9 @@ async function onUserSubmit() {
   if (!valid) return
   userSubmitting.value = true
   try {
-    const deptId = typeof userForm.departmentId === 'string'
-      ? Number(userForm.departmentId) || undefined
-      : (userForm.departmentId ?? undefined)
+    // 注意：部门/角色 ID 为雪花 ID，超过 JS 安全整数范围，
+    // 必须以字符串形式提交，否则 Number() 转换会丢失精度，导致存入错误的 ID。
+    const deptId = userForm.departmentId ?? undefined
 
     if (isEdit.value && userForm.id != null) {
       await updateUser(userForm.id, {

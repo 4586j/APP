@@ -12,6 +12,7 @@ import com.erp.data.entity.DatUpload;
 import com.erp.data.mapper.DatUploadMapper;
 import com.erp.data.service.DatUploadService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,11 +34,30 @@ public class DatUploadServiceImpl implements DatUploadService {
     private final Path uploadRoot;
 
     private final DatUploadMapper mapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public DatUploadServiceImpl(@Value("${app.upload.data-root:./uploads/data}") String dataRoot,
-                                DatUploadMapper mapper) {
+                                DatUploadMapper mapper,
+                                JdbcTemplate jdbcTemplate) {
         this.uploadRoot = Path.of(dataRoot).toAbsolutePath().normalize();
         this.mapper = mapper;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    /** 批量查询用户 ID → 用户名映射（只查 sys_user，避免与 erp-user 模块循环依赖）。 */
+    private Map<Long, String> loadUserNames(Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) return Collections.emptyMap();
+        String inClause = userIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT id, real_name, username FROM sys_user WHERE id IN (" + inClause + ") AND deleted = 0");
+        Map<Long, String> result = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            Long id = ((Number) row.get("id")).longValue();
+            String realName = (String) row.get("real_name");
+            String username = (String) row.get("username");
+            result.put(id, realName != null && !realName.isBlank() ? realName : username);
+        }
+        return result;
     }
 
     @Override
@@ -52,17 +72,27 @@ public class DatUploadServiceImpl implements DatUploadService {
         }
         w.orderByDesc(DatUpload::getCreatedAt);
         Page<DatUpload> p = mapper.selectPage(new Page<>(q.getPageNum(), Math.min(q.getPageSize(), 100)), w);
-        return new DataUploadPageVO(p.getTotal(), q.getPageNum(), q.getPageSize(),
-            p.getRecords().stream().map(this::toVO).collect(Collectors.toList()));
+        List<DataUploadVO> voList = p.getRecords().stream().map(this::toVO).collect(Collectors.toList());
+        // 批量填充上传人姓名
+        Set<Long> creatorIds = voList.stream().map(DataUploadVO::getCreatedBy)
+            .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> nameMap = loadUserNames(creatorIds);
+        voList.forEach(v -> v.setCreatedByName(nameMap.get(v.getCreatedBy())));
+        return new DataUploadPageVO(p.getTotal(), q.getPageNum(), q.getPageSize(), voList);
     }
 
     @Override
     public DataUploadVO getById(Long id) {
-        return toVO(mapper.selectById(id));
+        DataUploadVO vo = toVO(mapper.selectById(id));
+        if (vo != null && vo.getCreatedBy() != null) {
+            Map<Long, String> nameMap = loadUserNames(Collections.singleton(vo.getCreatedBy()));
+            vo.setCreatedByName(nameMap.get(vo.getCreatedBy()));
+        }
+        return vo;
     }
 
     @Override
-    public Long upload(String fileName, String fileType, Long fileSize, String department) {
+    public Long upload(String fileName, String fileType, Long fileSize, String department, Long userId) {
         DatUpload e = new DatUpload();
         e.setFileName(fileName);
         e.setFileType(fileType);
@@ -72,12 +102,13 @@ public class DatUploadServiceImpl implements DatUploadService {
         e.setRowCount(0);
         e.setParsed(false);
         e.setUploadType("manual");
+        if (userId != null && userId > 0) e.setCreatedBy(userId);
         mapper.insert(e);
         return e.getId();
     }
 
     @Override
-    public Long uploadFile(MultipartFile file, String fileType, String department) {
+    public Long uploadFile(MultipartFile file, String fileType, String department, Long userId) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("请选择要上传的文件");
         }
@@ -108,6 +139,7 @@ public class DatUploadServiceImpl implements DatUploadService {
         e.setRowCount(0);
         e.setParsed(false);
         e.setUploadType("file");
+        if (userId != null && userId > 0) e.setCreatedBy(userId);
         mapper.insert(e);
         return e.getId();
     }

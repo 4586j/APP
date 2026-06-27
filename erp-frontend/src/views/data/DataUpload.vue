@@ -18,7 +18,7 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :icon="Search" @click="doSearch">查询</el-button>
-          <el-button :icon="Upload" @click="openUploadDialog">上传文件</el-button>
+          <el-button v-if="hasPerm('data:upload:create')" :icon="Upload" @click="openUploadDialog">上传文件</el-button>
         </el-form-item>
       </el-form>
     </div>
@@ -33,7 +33,7 @@
           <template #default="{ row }">{{ formatSize(row.fileSize) }}</template>
         </el-table-column>
         <el-table-column prop="department" label="共享部门" width="160" />
-        <el-table-column prop="createdBy" label="上传人" width="90" />
+        <el-table-column prop="createdByName" label="上传人" width="100" />
         <el-table-column prop="createdAt" label="上传时间" width="180" />
         <el-table-column label="操作" width="160" align="center">
           <template #default="{ row }">
@@ -46,7 +46,7 @@
             >
               下载
             </el-button>
-            <el-popconfirm title="确定逻辑删除该上传记录？" @confirm="doDelete(row.id)">
+            <el-popconfirm v-if="hasPerm('data:upload:delete')" title="确定逻辑删除该上传记录？" @confirm="doDelete(row.id)">
               <template #reference>
                 <el-button type="danger" link size="small">删除</el-button>
               </template>
@@ -95,7 +95,17 @@
           </el-select>
         </el-form-item>
         <el-form-item label="共享部门">
-          <el-input v-model="uploadForm.department" placeholder="如：销售部、采购部" />
+          <el-tree-select
+            v-model="uploadForm.departmentId"
+            :data="departmentTree"
+            :props="{ label: 'name', children: 'children' }"
+            node-key="id"
+            check-strictly
+            filterable
+            clearable
+            placeholder="点击选择部门"
+            style="width:100%"
+          />
         </el-form-item>
         <el-form-item label="已选文件" v-if="selectedFile">
           <span>{{ selectedFile.name }}（{{ formatSize(selectedFile.size) }}）</span>
@@ -119,6 +129,7 @@ import { reactive, ref, onMounted } from 'vue'
 import { Search, Upload, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, type UploadFile, type UploadInstance, type UploadRawFile } from 'element-plus'
 import { listUploads, uploadDataFile, deleteUpload, downloadUpload, type DataUploadVO } from '@/api/data'
+import { getDepartmentOptions, type DepartmentNode, type Id } from '@/api/system'
 import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
@@ -132,9 +143,30 @@ const records = ref<DataUploadVO[]>([])
 const showUploadDialog = ref(false)
 const selectedFile = ref<File | null>(null)
 const uploadRef = ref<UploadInstance>()
+const departmentTree = ref<DepartmentNode[]>([])
 
 const query = reactive({ pageNum: 1, pageSize: 20, keyword: '', fileType: '' })
-const uploadForm = reactive({ fileType: 'market_data', department: '' })
+const uploadForm = reactive<{ fileType: string; departmentId: Id | null }>({ fileType: 'market_data', departmentId: null })
+
+/** 在部门树中按 ID 查找部门名。 */
+function findDeptName(nodes: DepartmentNode[], targetId: Id): string | null {
+  for (const n of nodes) {
+    if (String(n.id) === String(targetId)) return n.name
+    if (n.children?.length) {
+      const hit = findDeptName(n.children, targetId)
+      if (hit) return hit
+    }
+  }
+  return null
+}
+
+async function loadDepartments() {
+  try {
+    departmentTree.value = await getDepartmentOptions()
+  } catch (e) {
+    console.error('Failed to load departments:', e)
+  }
+}
 
 function formatSize(bytes: number): string {
   if (!bytes) return '0 B'
@@ -179,7 +211,7 @@ function onFileExceed(files: File[]) {
 function resetUploadForm() {
   selectedFile.value = null
   uploadForm.fileType = 'market_data'
-  uploadForm.department = ''
+  uploadForm.departmentId = null
   uploadPercent.value = 0
   uploadRef.value?.clearFiles()
 }
@@ -190,7 +222,11 @@ async function doUpload() {
   uploading.value = true
   uploadPercent.value = 0
   try {
-    await uploadDataFile(selectedFile.value, uploadForm.fileType, uploadForm.department, (percent) => {
+    // 共享部门：树选择器选中部门 ID 后，取部门名作为 department 字段提交（避免雪花 ID 精度问题，字段存名字）
+    const departmentName = uploadForm.departmentId != null
+      ? findDeptName(departmentTree.value, uploadForm.departmentId) ?? undefined
+      : undefined
+    await uploadDataFile(selectedFile.value, uploadForm.fileType, departmentName, (percent) => {
       uploadPercent.value = percent
     })
     ElMessage.success('上传成功')
@@ -235,5 +271,8 @@ async function doDelete(id: string) {
   }
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  fetchData()
+  loadDepartments()
+})
 </script>

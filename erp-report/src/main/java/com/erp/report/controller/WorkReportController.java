@@ -19,16 +19,14 @@ public class WorkReportController {
 
     final WorkReportService service;
 
-    /** 获取今日计划和日志 */
+    /** 获取今日计划和日志（个人工作台数据，登录即可访问） */
     @GetMapping("/today")
-    @PreAuthorize("hasAnyAuthority('work:plan:view','work:log:view')")
     public R<WorkReportVO> today(@CurrentUser LoginUser user) {
         return R.ok(service.getToday(user));
     }
 
-    /** 当月统计 */
+    /** 当月统计（个人工作台数据，登录即可访问） */
     @GetMapping("/stats")
-    @PreAuthorize("hasAnyAuthority('work:plan:view','work:log:view')")
     public R<WorkReportStatsVO> stats(@CurrentUser LoginUser user) {
         return R.ok(service.getStats(user));
     }

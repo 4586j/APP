@@ -20,6 +20,8 @@ public class DataUploadVO {
     private Integer rowCount;
     private Boolean parsed;
     private String remark;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long createdBy;
+    private String createdByName;
     private LocalDateTime createdAt;
 }
