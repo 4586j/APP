@@ -54,10 +54,25 @@
           >
             批量导入
           </el-button>
+          <el-button
+            v-if="hasPerm('user:update')"
+            :icon="Key"
+            :disabled="selectedUserIds.length === 0"
+            @click="openBatchResetPwdDialog"
+          >
+            批量重置密码
+          </el-button>
           <el-button :icon="Download" @click="doExport">导出</el-button>
         </div>
       </div>
-      <el-table v-loading="loading" :data="users as any[]" stripe size="small">
+      <el-table
+        v-loading="loading"
+        :data="users as any[]"
+        stripe
+        size="small"
+        @selection-change="onSelectionChange"
+      >
+        <el-table-column type="selection" width="55" align="center" />
         <el-table-column prop="username" label="用户名" width="120" />
         <el-table-column prop="realName" label="姓名" width="120" />
         <el-table-column prop="departmentName" label="部门" width="120" align="center">
@@ -93,6 +108,16 @@
               @click="openUserDialog(row)"
             >
               编辑
+            </el-button>
+            <el-button
+              v-if="hasPerm('user:update')"
+              type="warning"
+              link
+              size="small"
+              :disabled="row.username === 'admin'"
+              @click="openResetPwdDialog(row)"
+            >
+              重置密码
             </el-button>
             <el-popconfirm title="确定删除该用户？" @confirm="doDelete(row.id)"
             >
@@ -220,11 +245,33 @@
         <el-button type="primary" :loading="importing" :disabled="!selectedFile" @click="doImport">确认导入</el-button>
       </template>
     </el-dialog>
+
+    <!-- 重置密码对话框（单个/批量共用） -->
+    <el-dialog v-model="pwdDialogVisible" :title="pwdDialogTitle" width="420px" @closed="resetPwdForm">
+      <p v-if="pwdBatchMode" style="margin-bottom:16px;color:#606266">
+        已选择 <strong>{{ selectedUserIds.length }}</strong> 位用户
+      </p>
+      <p v-else style="margin-bottom:16px;color:#606266">
+        正在重置用户：<strong>{{ pwdTargetUser?.username }}</strong>（{{ pwdTargetUser?.realName }}）
+      </p>
+      <el-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-width="100px">
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input v-model="pwdForm.newPassword" type="password" show-password placeholder="8-64位" />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input v-model="pwdForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="pwdDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="pwdSubmitting" @click="onPwdSubmit">确认重置</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadFile, type UploadInstance } from 'element-plus'
 import {
   Search,
@@ -234,6 +281,7 @@ import {
   Download,
   UploadFilled,
   Document,
+  Key,
 } from '@element-plus/icons-vue'
 import {
   listDepartments,
@@ -246,6 +294,8 @@ import {
   assignUserRoles,
   importUsersExcel,
   downloadUserTemplate,
+  resetPassword,
+  batchResetPassword,
   type DepartmentNode,
   type SystemUser,
   type UserQuery,
@@ -261,6 +311,7 @@ const hasPerm = (perm: string) => userStore.hasPermission(perm)
 const loading = ref(false)
 const users = ref<SystemUser[]>([])
 const total = ref(0)
+const selectedUserIds = ref<Id[]>([])
 type TreeSelectNode = { label: string; value: Id; children?: TreeSelectNode[] }
 const departmentOptions = ref<TreeSelectNode[]>([])
 const query = reactive<UserQuery>({ page: 1, size: 10 })
@@ -305,6 +356,54 @@ async function doDelete(id: Id) {
   } catch (e: any) {
     ElMessage.error(e?.message || '删除失败')
   }
+}
+
+function onSelectionChange(rows: SystemUser[]) {
+  selectedUserIds.value = rows.map((r) => r.id)
+}
+
+function openResetPwdDialog(row: any) {
+  pwdBatchMode.value = false
+  pwdTargetUser.value = row as SystemUser
+  pwdForm.newPassword = ''
+  pwdForm.confirmPassword = ''
+  pwdDialogVisible.value = true
+}
+
+function openBatchResetPwdDialog() {
+  pwdBatchMode.value = true
+  pwdTargetUser.value = null
+  pwdForm.newPassword = ''
+  pwdForm.confirmPassword = ''
+  pwdDialogVisible.value = true
+}
+
+async function onPwdSubmit() {
+  const valid = await pwdFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  pwdSubmitting.value = true
+  try {
+    if (pwdBatchMode.value) {
+      await batchResetPassword(selectedUserIds.value, pwdForm.newPassword)
+      ElMessage.success(`已重置 ${selectedUserIds.value.length} 位用户的密码`)
+    } else {
+      await resetPassword(pwdTargetUser.value!.id, pwdForm.newPassword)
+      ElMessage.success('密码重置成功')
+    }
+    pwdDialogVisible.value = false
+    resetPwdForm()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '重置失败')
+  } finally {
+    pwdSubmitting.value = false
+  }
+}
+
+function resetPwdForm() {
+  pwdForm.newPassword = ''
+  pwdForm.confirmPassword = ''
+  pwdTargetUser.value = null
+  pwdFormRef.value?.resetFields()
 }
 
 // 用户弹窗
@@ -463,6 +562,35 @@ const selectedFile = ref<File | null>(null)
 const previewData = ref<any[]>([])
 const importResult = ref<{ successCount: number; failList: any[] } | null>(null)
 const importing = ref(false)
+
+// 重置密码
+const pwdDialogVisible = ref(false)
+const pwdSubmitting = ref(false)
+const pwdBatchMode = ref(false)
+const pwdTargetUser = ref<SystemUser | null>(null)
+const pwdFormRef = ref<FormInstance>()
+const pwdForm = reactive({
+  newPassword: '',
+  confirmPassword: '',
+})
+const pwdDialogTitle = computed(() => pwdBatchMode.value ? '批量重置密码' : '重置密码')
+
+const pwdRules: FormRules = {
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 8, max: 64, message: '新密码长度 8-64 位', trigger: 'blur' },
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认新密码', trigger: 'blur' },
+    {
+      validator: (_rule: any, value: string, callback: Function) => {
+        if (value !== pwdForm.newPassword) callback(new Error('两次输入的密码不一致'))
+        else callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+}
 
 function openImportDialog() {
   importDialogVisible.value = true

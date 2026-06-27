@@ -134,6 +134,10 @@ export function resetPassword(id: Id, newPassword: string) {
   return put<void>(`/system/users/${id}/reset-password`, { newPassword })
 }
 
+export function batchResetPassword(userIds: Id[], newPassword: string) {
+  return post<void>('/system/users/batch-reset-password', { userIds, newPassword })
+}
+
 export function assignUserRoles(id: Id, roleIds: Id[]) {
   return put<void>(`/system/users/${id}/roles`, { roleIds })
 }

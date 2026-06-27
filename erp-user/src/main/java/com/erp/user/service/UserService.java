@@ -17,6 +17,12 @@ public interface UserService {
     void lockUser(Long id);
     void unlockUser(Long id);
     void resetPassword(Long id, String newPassword);
+
+    /**
+     * 批量重置密码。
+     */
+    void batchResetPassword(List<Long> userIds, String newPassword);
+
     void assignRoles(Long userId, List<Long> roleIds);
     void updatePassword(String username, String encryptedPassword);
     void recordLoginSuccess(String username, String ip);

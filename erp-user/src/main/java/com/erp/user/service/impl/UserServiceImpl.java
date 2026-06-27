@@ -253,9 +253,24 @@ public class UserServiceImpl implements UserService {
     @Override @Transactional(rollbackFor = Exception.class) public void resetPassword(Long id, String newPassword) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BusinessException(R.CODE_NOT_FOUND, "user not found");
-        u.setPasswordHash(passwordEncoder.encode(newPassword)); userMapper.updateById(u);
+        u.setPasswordHash(passwordEncoder.encode(newPassword));
+        u.setPwdResetRequired(1);
+        userMapper.updateById(u);
         evictUserCache(u.getUsername());
     }
+
+    @Override @Transactional(rollbackFor = Exception.class) public void batchResetPassword(List<Long> userIds, String newPassword) {
+        String encoded = passwordEncoder.encode(newPassword);
+        for (Long id : userIds) {
+            SysUser u = userMapper.selectById(id);
+            if (u == null) continue;
+            u.setPasswordHash(encoded);
+            u.setPwdResetRequired(1);
+            userMapper.updateById(u);
+            evictUserCache(u.getUsername());
+        }
+    }
+
     @Override @Transactional(rollbackFor = Exception.class) public void assignRoles(Long userId, List<Long> roleIds) {
         userRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
         if (roleIds != null && !roleIds.isEmpty())
