@@ -100,10 +100,15 @@
         <el-form-item label="已选文件" v-if="selectedFile">
           <span>{{ selectedFile.name }}（{{ formatSize(selectedFile.size) }}）</span>
         </el-form-item>
+
+        <div v-if="uploading" style="margin-top:8px">
+          <div style="margin-bottom:6px;font-size:14px">正在上传: {{ uploadPercent }}%</div>
+          <el-progress :percentage="uploadPercent" :stroke-width="16" :striped="true" :striped-flow="true" />
+        </div>
       </el-form>
       <template #footer>
-        <el-button @click="showUploadDialog = false">取消</el-button>
-        <el-button type="primary" :loading="uploading" @click="doUpload">确认上传</el-button>
+        <el-button @click="showUploadDialog = false" :disabled="uploading">取消</el-button>
+        <el-button type="primary" :loading="uploading" :disabled="uploading" @click="doUpload">确认上传</el-button>
       </template>
     </el-dialog>
   </div>
@@ -121,6 +126,7 @@ const hasPerm = (perm: string) => userStore.hasPermission(perm)
 
 const loading = ref(false)
 const uploading = ref(false)
+const uploadPercent = ref(0)
 const total = ref(0)
 const records = ref<DataUploadVO[]>([])
 const showUploadDialog = ref(false)
@@ -174,6 +180,7 @@ function resetUploadForm() {
   selectedFile.value = null
   uploadForm.fileType = 'market_data'
   uploadForm.department = ''
+  uploadPercent.value = 0
   uploadRef.value?.clearFiles()
 }
 
@@ -181,8 +188,11 @@ async function doUpload() {
   if (!selectedFile.value) { ElMessage.warning('请选择要上传的文件'); return }
   if (!uploadForm.fileType) { ElMessage.warning('请选择文件类型'); return }
   uploading.value = true
+  uploadPercent.value = 0
   try {
-    await uploadDataFile(selectedFile.value, uploadForm.fileType, uploadForm.department)
+    await uploadDataFile(selectedFile.value, uploadForm.fileType, uploadForm.department, (percent) => {
+      uploadPercent.value = percent
+    })
     ElMessage.success('上传成功')
     showUploadDialog.value = false
     query.pageNum = 1

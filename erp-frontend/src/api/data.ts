@@ -46,13 +46,19 @@ export function createUpload(fileName: string, fileType: string, fileSize?: numb
   })
 }
 
-export function uploadDataFile(file: File, fileType: string, department?: string) {
+export function uploadDataFile(file: File, fileType: string, department?: string, onProgress?: (percent: number) => void) {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('fileType', fileType)
   if (department) formData.append('department', department)
   return post<Id>('/data/uploads', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
+    onUploadProgress: (progressEvent: any) => {
+      if (onProgress && progressEvent.total) {
+        onProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total))
+      }
+    },
   })
 }
 
