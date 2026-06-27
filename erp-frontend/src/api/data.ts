@@ -70,12 +70,37 @@ export interface BatchImportResult {
   failList: { index: number; name: string; reason: string }[]
 }
 
-export function importPricingExcel(file: File) {
+export interface ImportTaskVO {
+  taskId: string
+  fileName: string
+  status: 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED'
+  message: string
+  totalRows: number
+  processedRows: number
+  successCount: number
+  failCount: number
+  percent: number
+  failList: { index: number; name: string; reason: string }[]
+  createdAt: string
+  finishedAt?: string
+}
+
+export function importPricingExcel(file: File, onProgress?: (percent: number) => void) {
   const formData = new FormData()
   formData.append('file', file)
-  return post<BatchImportResult>('/data/pricing/import', formData, {
+  return post<ImportTaskVO>('/data/pricing/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
+    onUploadProgress: (progressEvent: any) => {
+      if (onProgress && progressEvent.total) {
+        onProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total))
+      }
+    },
   })
+}
+
+export function getImportProgress(taskId: string) {
+  return get<ImportTaskVO>(`/data/pricing/import/${taskId}/progress`)
 }
 
 export function downloadPricingTemplate() {

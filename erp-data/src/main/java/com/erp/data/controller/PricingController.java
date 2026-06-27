@@ -1,10 +1,10 @@
 package com.erp.data.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import com.erp.common.dto.BatchImportResult;
 import com.erp.common.model.R; import com.erp.data.dto.PricingPageVO;
 import com.erp.data.dto.PricingQuery; import com.erp.data.dto.PricingVO;
 import com.erp.data.dto.PricingCreateRequest;
 import com.erp.data.dto.PricingImportExcelDTO;
+import com.erp.data.dto.ImportTaskVO;
 import com.erp.data.service.PricingService;
 import com.alibaba.excel.EasyExcel;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,10 +28,26 @@ public class PricingController {
     @PutMapping("/{id}") public R<Void> update(@PathVariable Long id,@Valid @RequestBody PricingCreateRequest r){service.update(id,r);return R.ok();}
     @DeleteMapping("/{id}") public R<Void> delete(@PathVariable Long id){service.delete(id);return R.ok();}
 
+    /**
+     * 提交批量导入任务,立即返回 taskId,解析与入库在后台异步执行。
+     */
     @PostMapping(value = "/import", consumes = "multipart/form-data")
     @PreAuthorize("hasAuthority('data:pricing:import')")
-    public R<BatchImportResult> importExcel(@RequestParam("file") MultipartFile file) throws IOException {
-        return R.ok(service.batchImport(file.getInputStream()));
+    public R<ImportTaskVO> importExcel(@RequestParam("file") MultipartFile file) throws IOException {
+        return R.ok(service.submitImportTask(file));
+    }
+
+    /**
+     * 查询导入任务进度。
+     */
+    @GetMapping("/import/{taskId}/progress")
+    @PreAuthorize("hasAuthority('data:pricing:import')")
+    public R<ImportTaskVO> getImportProgress(@PathVariable String taskId) {
+        ImportTaskVO vo = service.getImportTask(taskId);
+        if (vo == null) {
+            return R.fail(R.CODE_NOT_FOUND, "任务不存在或已过期");
+        }
+        return R.ok(vo);
     }
 
     @GetMapping("/import-template")

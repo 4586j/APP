@@ -99,6 +99,37 @@ public class CacheTemplate {
     }
 
     /**
+     * 主动写入缓存，静默处理异常。
+     *
+     * @param key   Redis key
+     * @param value 缓存值（会被序列化为 JSON）
+     * @param ttl   过期时间
+     */
+    public void put(String key, Object value, Duration ttl) {
+        try {
+            String json = toJson(value);
+            if (json != null) {
+                redisTemplate.opsForValue().set(key, json, ttl);
+            }
+        } catch (RedisConnectionFailureException e) {
+            log.warn("Redis 连接失败，跳过写缓存, key={}: {}", key, e.getMessage());
+        } catch (Exception e) {
+            log.warn("Redis 写缓存异常, key={}: {}", key, e.getMessage());
+        }
+    }
+
+    private String toJson(Object value) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper()
+                .findAndRegisterModules()
+                .writeValueAsString(value);
+        } catch (Exception e) {
+            log.warn("缓存对象序列化失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * 批量删除缓存（按 pattern 不推荐生产用，这里只支持精确 key 列表）。
      */
     public void delete(String... keys) {

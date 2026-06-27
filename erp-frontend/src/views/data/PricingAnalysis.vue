@@ -149,20 +149,45 @@
           <div class="el-upload__tip">支持 .xlsx / .xls，文件大小不超过 10MB</div>
         </template>
       </el-upload>
-      <div v-if="previewData.length" style="margin-top:16px">
-        <h4>数据预览（前10行）</h4>
-        <el-table :data="previewData" size="small" border style="margin-top:8px">
-          <el-table-column prop="productId" label="产品ID" width="90" />
-          <el-table-column prop="title" label="分析标题" min-width="160" />
-          <el-table-column prop="costPrice" label="成本价" width="90" />
-          <el-table-column prop="targetPrice" label="目标价" width="90" />
-          <el-table-column prop="suggestedPrice" label="建议售价" width="90" />
-        </el-table>
+      <div v-if="selectedFile" style="margin-top:16px">
+        <h4>文件信息</h4>
+        <el-descriptions :column="2" size="small" border>
+          <el-descriptions-item label="文件名">{{ selectedFile.name }}</el-descriptions-item>
+          <el-descriptions-item label="大小">{{ formatFileSize(selectedFile.size) }}</el-descriptions-item>
+        </el-descriptions>
       </div>
+
+      <!-- 上传进度 -->
+      <div v-if="uploading" style="margin-top:16px">
+        <div style="margin-bottom:8px;font-size:14px">正在上传: {{ uploadPercent }}%</div>
+        <el-progress :percentage="uploadPercent" :stroke-width="16" :striped="true" :striped-flow="true" />
+      </div>
+
+      <!-- 解析/导入进度 -->
+      <div v-if="importingTaskId" style="margin-top:16px">
+        <div style="margin-bottom:8px;font-size:14px">
+          正在解析导入: {{ importProgress.percent }}%
+          <span v-if="importProgress.status === 'RUNNING'" style="color:#409EFF;margin-left:8px">
+            已读 {{ importProgress.totalRows }} 行,
+            成功 {{ importProgress.successCount }} 条,
+            失败 {{ importProgress.failCount }} 条
+          </span>
+        </div>
+        <el-progress
+          :percentage="importProgress.percent"
+          :stroke-width="16"
+          :status="importProgress.status === 'FAILED' ? 'exception' : ''"
+        />
+        <div v-if="importProgress.message" style="margin-top:8px;color:#606266;font-size:13px">
+          {{ importProgress.message }}
+        </div>
+      </div>
+
+      <!-- 导入结果 -->
       <div v-if="importResult" style="margin-top:16px">
         <el-alert
-          :title="`导入完成：成功 ${importResult.successCount} 条，失败 ${importResult.failList.length} 条`"
-          :type="importResult.failList.length ? 'warning' : 'success'"
+          :title="importResult.message || `导入完成：成功 ${importResult.successCount} 条，失败 ${importResult.failList.length} 条`"
+          :type="importResult.status === 'FAILED' ? 'error' : (importResult.failList.length ? 'warning' : 'success')"
           show-icon
         />
         <el-table v-if="importResult.failList.length" :data="importResult.failList" size="small" border style="margin-top:8px">
@@ -172,8 +197,8 @@
         </el-table>
       </div>
       <template #footer>
-        <el-button @click="showImportDialog = false">关闭</el-button>
-        <el-button type="primary" :loading="importing" :disabled="!selectedFile" @click="doImport">确认导入</el-button>
+        <el-button @click="showImportDialog = false" :disabled="Boolean(importingTaskId) && importProgress.status === 'RUNNING'">关闭</el-button>
+        <el-button type="primary" :loading="importing" :disabled="!selectedFile || importingTaskId != null" @click="doImport">确认导入</el-button>
       </template>
     </el-dialog>
   </div>
@@ -185,11 +210,11 @@ import { Search, Plus, Upload, Document } from '@element-plus/icons-vue'
 import { ElMessage, type TagProps, type UploadFile, type UploadInstance } from 'element-plus'
 import {
   listPricings, createPricing, updatePricing, deletePricing,
-  importPricingExcel, downloadPricingTemplate, type PricingVO,
+  importPricingExcel, getImportProgress, downloadPricingTemplate, type PricingVO,
+  type ImportTaskVO,
 } from '@/api/data'
 import type { Id } from '@/api/system'
 import { useUserStore } from '@/store/user'
-import * as XLSX from 'xlsx'
 
 const userStore = useUserStore()
 const hasPerm = (perm: string) => userStore.hasPermission(perm)
@@ -213,62 +238,89 @@ const form = reactive({
 const showImportDialog = ref(false)
 const importing = ref(false)
 const selectedFile = ref<File | null>(null)
-const previewData = ref<any[]>([])
-const importResult = ref<{ successCount: number; failList: any[] } | null>(null)
+const importResult = ref<ImportTaskVO | null>(null)
 const uploadRef = ref<UploadInstance>()
+
+// 上传进度
+const uploading = ref(false)
+const uploadPercent = ref(0)
+
+// 导入进度
+const importingTaskId = ref<string | null>(null)
+const importProgress = ref<ImportTaskVO>({
+  taskId: '', fileName: '', status: 'PENDING', message: '',
+  totalRows: 0, processedRows: 0, successCount: 0, failCount: 0, percent: 0, failList: [], createdAt: '',
+})
+let progressTimer: ReturnType<typeof setInterval> | null = null
 
 function openImportDialog() { showImportDialog.value = true; resetImport() }
 function resetImport() {
   selectedFile.value = null
-  previewData.value = []
   importResult.value = null
+  uploading.value = false
+  uploadPercent.value = 0
+  importingTaskId.value = null
+  importProgress.value = {
+    taskId: '', fileName: '', status: 'PENDING', message: '',
+    totalRows: 0, processedRows: 0, successCount: 0, failCount: 0, percent: 0, failList: [], createdAt: '',
+  }
+  if (progressTimer) { clearInterval(progressTimer); progressTimer = null }
   uploadRef.value?.clearFiles()
+}
+
+function formatFileSize(bytes?: number) {
+  if (bytes == null) return '-'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
 }
 
 function onFileChange(file: UploadFile) {
   selectedFile.value = file.raw || null
-  previewData.value = []
   importResult.value = null
-  if (file.raw) readExcelPreview(file.raw)
-}
-
-async function readExcelPreview(file: File) {
-  try {
-    const data = await file.arrayBuffer()
-    const workbook = XLSX.read(data)
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
-    if (!rows.length) { previewData.value = []; return }
-    const headers = rows[0] as string[]
-    const colIndex: Record<string, number> = {}
-    headers.forEach((h, i) => { colIndex[String(h).trim()] = i })
-    const dataRows = rows.slice(1, 11)
-    previewData.value = dataRows.map((row) => ({
-      productId: row[colIndex['产品ID'] ?? colIndex['productId'] ?? 0] || '',
-      title: row[colIndex['分析标题'] ?? colIndex['title'] ?? 1] || '',
-      costPrice: row[colIndex['成本价'] ?? colIndex['costPrice'] ?? 2] || '',
-      targetPrice: row[colIndex['目标价'] ?? colIndex['targetPrice'] ?? 3] || '',
-      suggestedPrice: row[colIndex['建议售价'] ?? colIndex['suggestedPrice'] ?? 5] || '',
-    }))
-  } catch (e) {
-    console.error('Excel preview failed:', e)
-    previewData.value = [{ productId: '-', title: '文件解析失败', costPrice: '-', targetPrice: '-', suggestedPrice: '-' }]
-  }
 }
 
 async function doImport() {
   if (!selectedFile.value) { ElMessage.warning('请选择文件'); return }
   importing.value = true
+  uploading.value = true
+  uploadPercent.value = 0
+  importingTaskId.value = null
+  importResult.value = null
   try {
-    const res = await importPricingExcel(selectedFile.value)
-    importResult.value = res
-    if (res.failList.length === 0) ElMessage.success(`成功导入 ${res.successCount} 条`)
-    await fetchData()
+    const task = await importPricingExcel(selectedFile.value, (percent) => {
+      uploadPercent.value = percent
+    })
+    uploading.value = false
+    importingTaskId.value = task.taskId
+    startPolling(task.taskId)
   } catch (e: any) {
-    ElMessage.error(e?.message || '导入失败')
-  } finally {
+    uploading.value = false
     importing.value = false
+    ElMessage.error(e?.message || '导入失败')
   }
+}
+
+function startPolling(taskId: string) {
+  if (progressTimer) clearInterval(progressTimer)
+  progressTimer = setInterval(async () => {
+    try {
+      const progress = await getImportProgress(taskId)
+      importProgress.value = progress
+      if (progress.status === 'DONE' || progress.status === 'FAILED') {
+        if (progressTimer) { clearInterval(progressTimer); progressTimer = null }
+        importing.value = false
+        importResult.value = progress
+        if (progress.status === 'DONE' && progress.failCount === 0) {
+          ElMessage.success(`成功导入 ${progress.successCount} 条`)
+        }
+        await fetchData()
+      }
+    } catch (e) {
+      console.error('查询导入进度失败:', e)
+    }
+  }, 1000)
 }
 
 async function downloadTemplate() {
