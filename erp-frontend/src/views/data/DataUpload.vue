@@ -32,7 +32,15 @@
         <el-table-column prop="fileSize" label="大小" width="90" align="right">
           <template #default="{ row }">{{ formatSize(row.fileSize) }}</template>
         </el-table-column>
-        <el-table-column prop="department" label="共享部门" width="160" />
+        <el-table-column prop="department" label="所属部门" width="120" />
+        <el-table-column prop="shareDeptNames" label="共享部门" width="180">
+          <template #default="{ row }">
+            <template v-if="row.shareDeptNames?.length">
+              <el-tag v-for="n in row.shareDeptNames" :key="n" size="small" style="margin:1px">{{ n }}</el-tag>
+            </template>
+            <span v-else class="text-muted">-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="createdByName" label="上传人" width="100" />
         <el-table-column prop="createdAt" label="上传时间" width="180" />
         <el-table-column label="操作" width="160" align="center">
@@ -94,16 +102,31 @@
             <el-option label="共享文档" value="shared_doc" />
           </el-select>
         </el-form-item>
-        <el-form-item label="共享部门">
+        <el-form-item label="所属部门">
           <el-tree-select
-            v-model="uploadForm.departmentId"
+            v-model="uploadForm.deptId"
             :data="departmentTree"
             :props="{ label: 'name', children: 'children' }"
             node-key="id"
             check-strictly
             filterable
             clearable
-            placeholder="点击选择部门"
+            placeholder="自动识别"
+            style="width:100%"
+          />
+        </el-form-item>
+        <el-form-item label="共享给部门">
+          <el-tree-select
+            v-model="uploadForm.shareDeptIds"
+            :data="departmentTree"
+            :props="{ label: 'name', children: 'children' }"
+            node-key="id"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            filterable
+            clearable
+            placeholder="选择多个部门（可选）"
             style="width:100%"
           />
         </el-form-item>
@@ -146,7 +169,9 @@ const uploadRef = ref<UploadInstance>()
 const departmentTree = ref<DepartmentNode[]>([])
 
 const query = reactive({ pageNum: 1, pageSize: 20, keyword: '', fileType: '' })
-const uploadForm = reactive<{ fileType: string; departmentId: Id | null }>({ fileType: 'market_data', departmentId: null })
+const uploadForm = reactive<{ fileType: string; deptId: Id | null; shareDeptIds: Id[] }>({
+  fileType: 'market_data', deptId: null, shareDeptIds: []
+})
 
 /** 在部门树中按 ID 查找部门名。 */
 function findDeptName(nodes: DepartmentNode[], targetId: Id): string | null {
@@ -211,7 +236,8 @@ function onFileExceed(files: File[]) {
 function resetUploadForm() {
   selectedFile.value = null
   uploadForm.fileType = 'market_data'
-  uploadForm.departmentId = null
+  uploadForm.deptId = null
+  uploadForm.shareDeptIds = []
   uploadPercent.value = 0
   uploadRef.value?.clearFiles()
 }
@@ -222,11 +248,14 @@ async function doUpload() {
   uploading.value = true
   uploadPercent.value = 0
   try {
-    // 共享部门：树选择器选中部门 ID 后，取部门名作为 department 字段提交（避免雪花 ID 精度问题，字段存名字）
-    const departmentName = uploadForm.departmentId != null
-      ? findDeptName(departmentTree.value, uploadForm.departmentId) ?? undefined
+    const departmentName = uploadForm.deptId != null
+      ? findDeptName(departmentTree.value, uploadForm.deptId) ?? undefined
       : undefined
-    await uploadDataFile(selectedFile.value, uploadForm.fileType, departmentName, (percent) => {
+    const deptId = uploadForm.deptId != null ? String(uploadForm.deptId) : undefined
+    const shareDeptIds = uploadForm.shareDeptIds.length > 0
+      ? uploadForm.shareDeptIds.map(String).join(',')
+      : undefined
+    await uploadDataFile(selectedFile.value, uploadForm.fileType, departmentName, deptId, shareDeptIds, (percent) => {
       uploadPercent.value = percent
     })
     ElMessage.success('上传成功')

@@ -17,10 +17,14 @@ export interface DataUploadVO {
   fileSize: number
   filePath?: string
   department: string
+  deptId?: string
+  shareDeptIds?: string[]
+  shareDeptNames?: string[]
   rowCount: number
   parsed: boolean
   remark: string
   createdBy: string
+  createdByName?: string
   createdAt: string
 }
 
@@ -39,18 +43,20 @@ export function getUpload(id: string) {
   return get<DataUploadVO>(`/data/uploads/${id}`)
 }
 
-export function createUpload(fileName: string, fileType: string, fileSize?: number, department?: string) {
+export function createUpload(fileName: string, fileType: string, fileSize?: number, department?: string, deptId?: string, shareDeptIds?: string) {
   return post<Id>('/data/uploads', null, {
-    params: { fileName, fileType, fileSize, department },
+    params: { fileName, fileType, fileSize, department, deptId, shareDeptIds },
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
   })
 }
 
-export function uploadDataFile(file: File, fileType: string, department?: string, onProgress?: (percent: number) => void) {
+export function uploadDataFile(file: File, fileType: string, department?: string, deptId?: string, shareDeptIds?: string, onProgress?: (percent: number) => void) {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('fileType', fileType)
   if (department) formData.append('department', department)
+  if (deptId) formData.append('deptId', deptId)
+  if (shareDeptIds) formData.append('shareDeptIds', shareDeptIds)
   return post<Id>('/data/uploads', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 0,
