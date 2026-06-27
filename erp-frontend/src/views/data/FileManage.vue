@@ -38,7 +38,9 @@
             <el-button size="small" @click="refreshList">🔄 刷新</el-button>
             <el-button v-if="hasPerm('data:upload:create')" size="small" type="primary" @click="showNewFolderDialog = true">📁 新建文件夹</el-button>
             <el-button v-if="hasPerm('data:upload:create')" size="small" type="primary" @click="showUploadDialog = true">⬆ 上传</el-button>
+            <el-button v-if="hasPerm('data:upload:create')" size="small" type="primary" @click="triggerFolderUpload">📁 上传文件夹</el-button>
             <input ref="fileInputRef" type="file" multiple style="display:none" />
+            <input ref="folderInputRef" type="file" webkitdirectory style="display:none" @change="onFolderSelected" />
           </div>
           <div class="toolbar-right">
             <el-input v-model="searchKeyword" placeholder="搜索当前目录" size="small" clearable style="width:200px" @keyup.enter="doSearch" />
@@ -148,6 +150,14 @@
         <el-button v-if="!uploading" @click="showUploadDialog = false">取消</el-button>
         <el-button v-if="!uploading" type="primary" :disabled="!uploadFiles.length" @click="doUploadFiles">开始上传</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 文件夹上传进度 -->
+    <el-dialog v-model="showFolderUploadDialog" title="上传文件夹" width="480px" :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false">
+      <div style="text-align:center;padding:20px">
+        <el-progress :percentage="folderUploadPercent" :stroke-width="20" :striped="true" :striped-flow="true" />
+        <p style="margin-top:10px;color:#606266">{{ folderUploadProgress }}</p>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -347,12 +357,97 @@ async function doDownload(row: DatFileVO) {
 
 // 上传
 const fileInputRef = ref<HTMLInputElement>()
+const folderInputRef = ref<HTMLInputElement>()
 const showUploadDialog = ref(false)
 const uploading = ref(false)
 const uploadPercent = ref(0)
 const uploadFiles = ref<File[]>([])
 const uploadShareDeptIds = ref<Id[]>([])
 const uploadRef = ref<UploadInstance>()
+
+// 文件夹上传
+const uploadingFolder = ref(false)
+const folderUploadProgress = ref('')
+const folderUploadPercent = ref(0)
+const showFolderUploadDialog = ref(false)
+
+function triggerFolderUpload() {
+  folderInputRef.value?.click()
+}
+
+async function onFolderSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.files || !input.files.length) return
+
+  const files = Array.from(input.files)
+  const shareIds = uploadShareDeptIds.value.length > 0
+    ? uploadShareDeptIds.value.map(String).join(',')
+    : undefined
+
+  // 解析目录结构
+  const dirMap = new Map<string, string>() // relativeDirPath -> serverFolderId
+  showFolderUploadDialog.value = true
+  uploadingFolder.value = true
+  folderUploadPercent.value = 0
+  folderUploadProgress.value = '正在创建目录结构...'
+
+  try {
+    // 收集所有唯一目录路径（按深度排序，确保父目录先创建）
+    const dirSet = new Set<string>()
+    for (const file of files) {
+      const path = file.webkitRelativePath || file.name
+      const parts = path.split('/')
+      // parts[0] 是根文件夹名，逐级创建
+      for (let i = 0; i < parts.length - 1; i++) {
+        const dirPath = parts.slice(0, i + 1).join('/')
+        dirSet.add(dirPath)
+      }
+    }
+    // 按深度排序
+    const sortedDirs = Array.from(dirSet).sort((a, b) => a.split('/').length - b.split('/').length)
+
+    // 逐级创建目录
+    for (const dirPath of sortedDirs) {
+      const parts = dirPath.split('/')
+      const name = parts[parts.length - 1]
+      const parentRelPath = parts.slice(0, -1).join('/')
+      const parentId = parentRelPath ? dirMap.get(parentRelPath) : currentParentId.value
+      try {
+        const id = await createFolder(parentId, name)
+        dirMap.set(dirPath, id)
+      } catch (e: any) {
+        console.error(`创建目录失败: ${dirPath}`, e)
+      }
+    }
+
+    // 上传文件
+    let completed = 0
+    for (const file of files) {
+      const relPath = file.webkitRelativePath || file.name
+      const parts = relPath.split('/')
+      const dirPath = parts.slice(0, -1).join('/')
+      const targetParentId = dirPath ? dirMap.get(dirPath) : currentParentId.value
+
+      folderUploadProgress.value = `正在上传: ${relPath}`
+      try {
+        await uploadFileToNetdisk(file, targetParentId, undefined, undefined, shareIds)
+      } catch (e: any) {
+        console.error(`上传失败: ${relPath}`, e)
+      }
+      completed++
+      folderUploadPercent.value = Math.round((completed / files.length) * 100)
+    }
+
+    ElMessage.success(`文件夹上传完成，共 ${files.length} 个文件`)
+    showFolderUploadDialog.value = false
+    await refreshList()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '文件夹上传失败')
+  } finally {
+    uploadingFolder.value = false
+    input.value = '' // 清空 input 以便重复选择同一文件夹
+  }
+}
 
 function triggerUpload() {
   showUploadDialog.value = true
