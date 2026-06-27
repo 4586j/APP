@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface DatUploadService {
-    DataUploadPageVO listPage(DataUploadQuery q);
+    DataUploadPageVO listPage(DataUploadQuery q, com.erp.security.user.LoginUser user);
     DataUploadVO getById(Long id);
     Long upload(String fileName, String fileType, Long fileSize, String department, Long userId);
 
