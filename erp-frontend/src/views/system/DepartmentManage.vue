@@ -552,7 +552,7 @@ async function openUserPermDialog(row: any) {
 async function loadDeptUsers(deptId: Id) {
   userLoading.value = true
   try {
-    const res = await listUsers({ pageNum: 1, pageSize: 999, departmentId: deptId })
+    const res = await listUsers({ page: 1, size: 999, departmentId: deptId })
     deptUsers.value = (res as any).records || []
   } catch (e: any) {
     console.error('Failed to load dept users:', e)

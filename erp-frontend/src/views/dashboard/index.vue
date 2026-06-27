@@ -315,7 +315,7 @@ const shortcuts = computed(() => {
     { label: '产品管理', icon: 'Goods', path: '/product', bg: '#f0fdf4', color: '#16a34a', perm: 'product' },
     { label: '客户列表', icon: 'User', path: '/customer/list', bg: '#fefce8', color: '#ca8a04', perm: 'customer' },
     { label: '资金审批', icon: 'Money', path: '/finance/fund', bg: '#fdf4ff', color: '#a855f7', perm: 'finance:fund' },
-    { label: '数据上传', icon: 'DataAnalysis', path: '/data/upload', bg: '#f0f9ff', color: '#0ea5e9', perm: 'data:upload:create' },
+    { label: '企业网盘', icon: 'DataAnalysis', path: '/data/upload', bg: '#f0f9ff', color: '#0ea5e9', perm: 'data:upload:create' },
   ]
   return all.filter(s => userStore.hasPermission(s.perm) || userStore.hasPermission(s.perm + ':view') || userStore.hasPermission(s.perm + ':create'))
 })

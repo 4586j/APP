@@ -115,6 +115,85 @@ export function getImportProgress(taskId: string) {
   return get<ImportTaskVO>(`/data/pricing/import/${taskId}/progress`)
 }
 
+/* ---- 企业网盘 ---- */
+export interface DatFileQuery {
+  parentId?: string
+  keyword?: string
+  fileType?: string
+  pageNum?: number
+  pageSize?: number
+}
+
+export interface DatFileVO {
+  id: string
+  parentId?: string
+  isDirectory: number
+  name: string
+  displayName?: string
+  extension?: string
+  mimeType?: string
+  fileSize: number
+  fileType?: string
+  department?: string
+  deptId?: string
+  shareDeptIds?: string[]
+  shareDeptNames?: string[]
+  rowCount?: number
+  parsed?: boolean
+  remark?: string
+  createdBy: string
+  createdByName?: string
+  createdAt: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+export function listFiles(params: DatFileQuery) {
+  return get<DatFileVO[]>('/files', params)
+}
+
+export function getBreadcrumb(fileId?: string) {
+  return get<DatFileVO[]>('/files/breadcrumb', { fileId })
+}
+
+export function createFolder(parentId: string | undefined, name: string) {
+  return post<string>('/files/folder', null, { params: { parentId, name } })
+}
+
+export function uploadFileToNetdisk(file: File, parentId: string | undefined, fileType: string | undefined, deptId: string | undefined, shareDeptIds: string | undefined, onProgress?: (percent: number) => void) {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (parentId) formData.append('parentId', parentId)
+  if (fileType) formData.append('fileType', fileType)
+  if (deptId) formData.append('deptId', deptId)
+  if (shareDeptIds) formData.append('shareDeptIds', shareDeptIds)
+  return post<string>('/files', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
+    onUploadProgress: (progressEvent: any) => {
+      if (onProgress && progressEvent.total) {
+        onProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total))
+      }
+    },
+  })
+}
+
+export function renameFile(id: string, name: string) {
+  return put<void>(`/files/${id}/rename`, null, { params: { name } })
+}
+
+export function moveFile(id: string, targetParentId: string | undefined) {
+  return put<void>(`/files/${id}/move`, null, { params: { targetParentId } })
+}
+
+export function deleteFile(id: string) {
+  return del<void>(`/files/${id}`)
+}
+
+export function downloadFile(id: string) {
+  return get<Blob>(`/files/${id}/download`, undefined, { responseType: 'blob' })
+}
+
 export function downloadPricingTemplate() {
   return get<Blob>('/data/pricing/import-template', undefined, { responseType: 'blob' })
 }

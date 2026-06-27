@@ -117,8 +117,8 @@ const routes: RouteRecordRaw[] = [
           {
             path: 'upload',
             name: 'DataUpload',
-            component: () => import('@/views/data/DataUpload.vue'),
-            meta: { title: '数据上传' },
+            component: () => import('@/views/data/FileManage.vue'),
+            meta: { title: '企业网盘' },
           },
           {
             path: 'analysis',

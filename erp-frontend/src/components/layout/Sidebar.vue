@@ -81,7 +81,7 @@ const menuItems: MenuItem[] = [
   { path: '/document', title: '单证管理', icon: 'Files', permission: 'document:view' },
   {
     path: '/data', title: '数据中心', icon: 'DataAnalysis', permission: 'data:view', children: [
-      { path: '/data/upload', title: '数据上传', permission: 'data:view' },
+      { path: '/data/upload', title: '企业网盘', permission: 'data:view' },
       { path: '/data/analysis', title: '定价分析', permission: 'data:view' },
     ],
   },
