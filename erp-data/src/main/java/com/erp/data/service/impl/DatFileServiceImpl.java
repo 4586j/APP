@@ -167,6 +167,8 @@ public class DatFileServiceImpl implements DatFileService {
 
         if (parentId != null) {
             all = mapper.selectByParentId(parentId);
+        } else if (q.getDeptId() != null) {
+            all = mapper.selectRootFilesByDeptId(q.getDeptId());
         } else {
             all = mapper.selectRootFiles();
         }

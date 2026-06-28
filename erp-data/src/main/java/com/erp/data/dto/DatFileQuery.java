@@ -10,6 +10,7 @@ import java.util.List;
 @Data
 public class DatFileQuery {
     private Long parentId;
+    private Long deptId;
     private String keyword;
     private String fileType;
     private Integer pageNum = 1;

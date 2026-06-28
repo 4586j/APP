@@ -118,6 +118,7 @@ export function getImportProgress(taskId: string) {
 /* ---- 企业网盘 ---- */
 export interface DatFileQuery {
   parentId?: string
+  deptId?: string
   keyword?: string
   fileType?: string
   pageNum?: number

@@ -190,6 +190,7 @@ const deptTree = ref<any[]>([{ id: 'root', name: '全部文件', children: [] }]
 const fileList = ref<DatFileVO[]>([])
 const breadcrumb = ref<DatFileVO[]>([])
 const currentParentId = ref<string | undefined>(undefined)
+const currentDeptId = ref<string | undefined>(undefined)
 const searchKeyword = ref('')
 
 // 目录树
@@ -214,10 +215,12 @@ async function loadDeptTree() {
 
 function onTreeClick(data: any) {
   if (data.id === 'root') {
-    currentParentId.value = undefined
+    currentDeptId.value = undefined
   } else {
-    currentParentId.value = undefined // 切换部门时，只列出该部门的根文件
+    currentDeptId.value = data.id
   }
+  currentParentId.value = undefined
+  breadcrumb.value = []
   refreshList()
 }
 
@@ -236,6 +239,7 @@ async function loadBreadcrumb() {
 
 function navigateToRoot() {
   currentParentId.value = undefined
+  currentDeptId.value = undefined
   breadcrumb.value = []
   refreshList()
 }
@@ -262,7 +266,10 @@ function goUp() {
 async function refreshList() {
   loading.value = true
   try {
-    const params: DatFileQuery = { parentId: currentParentId.value }
+    const params: DatFileQuery = {
+      parentId: currentParentId.value,
+      deptId: currentDeptId.value,
+    }
     if (searchKeyword.value) params.keyword = searchKeyword.value
     fileList.value = await listFiles(params)
   } catch (e: any) {
