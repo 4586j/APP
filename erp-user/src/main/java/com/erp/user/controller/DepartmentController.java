@@ -33,7 +33,6 @@ public class DepartmentController {
     @DeleteMapping("/{id}") @PreAuthorize("hasAuthority('department:delete')") public R<Void> delete(@PathVariable Long id) { departmentService.delete(id); return R.ok(); }
 
     @GetMapping("/select-options")
-    @PreAuthorize("hasAuthority('department:view')")
     public R<List<DepartmentOption>> selectOptions(@RequestParam(required = false) String keyword) {
         return R.ok(departmentService.selectOptions(keyword));
     }
