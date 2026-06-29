@@ -28,6 +28,8 @@ public class R<T> implements Serializable {
     public static final int CODE_PARAM_INVALID = 400;
     public static final int CODE_FORBIDDEN = 400 + 3;
     public static final int CODE_NOT_FOUND = 400 + 4;
+    /** WebDAV Locked（423）。 */
+    public static final int CODE_LOCKED = 423;
 
     private int code;
     private String message;
