@@ -65,14 +65,14 @@ public class WorkReportServiceImpl implements WorkReportService {
                 .eq(RptWorkPlan::getUserId, uid)
                 .ge(RptWorkPlan::getReportDate, start)
                 .le(RptWorkPlan::getReportDate, end)
-                .eq(RptWorkPlan::getStatus, "submitted")
+                .in(RptWorkPlan::getStatus, "draft", "submitted")
         );
         long logCount = logMapper.selectCount(
             new LambdaQueryWrapper<RptWorkLog>()
                 .eq(RptWorkLog::getUserId, uid)
                 .ge(RptWorkLog::getReportDate, start)
                 .le(RptWorkLog::getReportDate, end)
-                .eq(RptWorkLog::getStatus, "submitted")
+                .in(RptWorkLog::getStatus, "draft", "submitted")
         );
         long rejectedCount = planMapper.selectCount(
             new LambdaQueryWrapper<RptWorkPlan>()

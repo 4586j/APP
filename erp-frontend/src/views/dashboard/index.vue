@@ -508,6 +508,7 @@ async function doSave() {
     }
     dialogVisible.value = false
     await loadTodayReport()
+    await loadReportStats()
   } catch (e: any) {
     ElMessage.error(e?.message || '保存失败')
   } finally {
