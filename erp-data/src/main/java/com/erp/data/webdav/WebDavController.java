@@ -8,6 +8,8 @@ import com.erp.data.entity.DatFile;
 import com.erp.data.service.DatFileService;
 import com.erp.security.user.LoginUser;
 import com.erp.security.user.UserDetailsLoader;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -15,9 +17,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.web.HttpRequestHandler;
 
 import java.io.IOException;
+import lombok.extern.slf4j.Slf4j;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -28,17 +30,22 @@ import java.util.Map;
 /**
  * WebDAV 协议处理器（OPTIONS/PROPFIND/GET/PUT/MKCOL/DELETE/MOVE/LOCK/UNLOCK）。
  *
- * <p>实现 {@link HttpRequestHandler} 并由 {@link WebDavHandlerMapping} 注册到 /webdav/**，
- * <b>不使用 {@code @RequestMapping}</b>：Spring MVC 的 RequestMappingHandlerMapping
- * 只识别标准 HttpMethod，对 PROPFIND/MKCOL/LOCK 等非标准方法会直接返回 400，
- * 无法到达 controller。原生 handler 按 {@code request.getMethod()} 自行分发，绕开此限制。
+ * <p>继承 {@link HttpServlet} 并由 {@link WebDavServletRegistration} 注册到 /webdav/*。
+ * <b>必须用原生 Servlet 而非 Spring MVC 的 @RequestMapping / HttpRequestHandler</b>：
+ * Spring 的 DispatcherServlet 继承 FrameworkServlet，其 service() 只对标准 HTTP 方法
+ * （GET/POST/PUT/DELETE/OPTIONS/TRACE/PATCH/HEAD）分发，PROPFIND/MKCOL/LOCK 等非标准
+ * 方法会落到 HttpServlet.service() 默认实现，返回 400 Bad Request，请求根本到不了
+ * HandlerMapping/Controller。原生 Servlet 重写 service() 自行按 request.getMethod()
+ * 分发，绕开此限制。
  *
- * <p>当前用户从 SecurityContext 取 username 后调 {@link UserDetailsLoader} 重加载
- * （复刻 {@code CurrentUserArgumentResolver} 逻辑，因原生 handler 不走参数解析器）。
+ * <p>仍受 Spring Security 的 webdav FilterChain 保护（filter 在 servlet 之前执行），
+ * Basic Auth 鉴权不受影响。当前用户从 SecurityContext 取 username 后调
+ * {@link UserDetailsLoader} 重加载（复刻 CurrentUserArgumentResolver 逻辑）。
  */
 @Component
+@Slf4j
 @RequiredArgsConstructor
-public class WebDavController implements HttpRequestHandler {
+public class WebDavController extends HttpServlet {
 
     private final WebDavPathResolver resolver;
     private final DatFileService fileService;
@@ -47,9 +54,10 @@ public class WebDavController implements HttpRequestHandler {
     private final JdbcTemplate jdbcTemplate;
     private final UserDetailsLoader userDetailsLoader;
 
-    // ========== 单入口分发 ==========
+    // ========== 单入口分发：重写 service() 接收所有 HTTP 方法（含 PROPFIND 等） ==========
     @Override
-    public void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        log.warn("[WebDAV-CTRL] {} {} (enter servlet)", request.getMethod(), request.getRequestURI());
         LoginUser user = currentUser();
         switch (request.getMethod()) {
             case "OPTIONS" -> options(response);

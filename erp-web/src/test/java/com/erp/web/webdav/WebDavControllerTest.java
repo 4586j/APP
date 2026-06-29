@@ -68,7 +68,7 @@ class WebDavControllerTest {
             req.setContent("<x/>".getBytes());
         }
         MockHttpServletResponse resp = new MockHttpServletResponse();
-        controller.handleRequest(req, resp);
+        controller.service(req, resp);
         return resp;
     }
 
