@@ -6,6 +6,7 @@ import com.erp.common.model.R;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -26,6 +27,14 @@ public class GlobalExceptionHandler {
     public R<Void> handleBusinessException(BusinessException ex) {
         log.warn("[业务异常] code={} msg={}", ex.getCode(), ex.getMessage());
         return R.fail(ex.getCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<R<Void>> handleAccessDenied(AuthorizationDeniedException ex) {
+        log.warn("[权限不足] {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(R.fail("没有权限，请联系管理员"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

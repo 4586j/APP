@@ -64,7 +64,7 @@ service.interceptors.response.use(
     if (status === 401) {
       promptRelogin('登录已过期，请重新登录')
     } else if (status === 403) {
-      ElMessage({ message: '没有权限访问该资源', type: 'warning' })
+      ElMessage({ message: '没有权限，请联系管理员', type: 'warning' })
     } else if (status >= 500) {
       ElMessage({ message: `服务器错误 (${status})`, type: 'error' })
     } else {
