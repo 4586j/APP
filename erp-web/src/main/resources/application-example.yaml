@@ -6,6 +6,10 @@ server:
 spring:
   profiles:
     active: dev
+  mvc:
+    # WebDAV：让 OPTIONS/TRACE 进入 DispatcherServlet 由 WebDavController 处理
+    dispatch-options-request: true
+    dispatch-trace-request: true
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/erp_demo2?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: YOUR_DB_USERNAME

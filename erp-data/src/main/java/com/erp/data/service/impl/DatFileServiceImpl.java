@@ -203,10 +203,17 @@ public class DatFileServiceImpl implements DatFileService {
             visibleDeptIds = getDeptAndDescendantIds(user.getDepartmentId());
         }
 
-        List<Long> finalVisibleDeptIds = visibleDeptIds;
-        List<DatFile> filtered = all.stream()
-            .filter(f -> isAdmin || canAccess(f, user))
-            .collect(Collectors.toList());
+        List<DatFile> filtered = new ArrayList<>();
+        for (DatFile f : all) {
+            if (isAdmin || canAccess(f, user)) {
+                filtered.add(f);
+            } else if (f.getIsDirectory() != null && f.getIsDirectory() == 1
+                    && user.getDepartmentId() != null && f.getPath() != null
+                    && mapper.selectSharedDescendantExists(f.getPath() + "/", user.getDepartmentId())) {
+                // 文件夹本身不可见，但含被共享给本部门的后代 → 保留以便下钻
+                filtered.add(f);
+            }
+        }
 
         // 关键词搜索
         if (q.getKeyword() != null && !q.getKeyword().isEmpty()) {
