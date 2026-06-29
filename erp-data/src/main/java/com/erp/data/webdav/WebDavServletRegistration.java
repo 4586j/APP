@@ -1,7 +1,7 @@
 package com.erp.data.webdav;
 
-import org.springframework.boot.web.servlet.ServletRegistrationBean;
-import org.springframework.context.annotation.Bean;
+import jakarta.servlet.ServletRegistration;
+import org.springframework.boot.web.servlet.ServletContextInitializer;
 import org.springframework.context.annotation.Configuration;
 
 /**
@@ -21,13 +21,18 @@ import org.springframework.context.annotation.Configuration;
  * Servlet，因为 /webdav/* 是前缀匹配，.getRequestURI() 返回完整原始路径）。
  */
 @Configuration
-public class WebDavServletRegistration {
+public class WebDavServletRegistration implements ServletContextInitializer {
 
-    @Bean
-    public ServletRegistrationBean<WebDavController> webdavServlet(WebDavController controller) {
-        ServletRegistrationBean<WebDavController> reg = new ServletRegistrationBean<>(controller, "/webdav/*");
-        reg.setName("webdavServlet");
+    private final WebDavController controller;
+
+    public WebDavServletRegistration(WebDavController controller) {
+        this.controller = controller;
+    }
+
+    @Override
+    public void onStartup(jakarta.servlet.ServletContext servletContext) {
+        ServletRegistration.Dynamic reg = servletContext.addServlet("webdavServlet", controller);
+        reg.addMapping("/webdav/*");
         reg.setLoadOnStartup(1);
-        return reg;
     }
 }
