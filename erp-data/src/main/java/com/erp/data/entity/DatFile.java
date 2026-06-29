@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class DatFile {
     private Long id;
     private Long parentId;
+    private String path;
     private Integer isDirectory;
     private String name;
     private String displayName;
