@@ -2,6 +2,7 @@ package com.erp.data.service;
 
 import com.erp.data.dto.DatFileQuery;
 import com.erp.data.dto.DatFileVO;
+import com.erp.data.entity.DatFile;
 import com.erp.security.user.LoginUser;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.multipart.MultipartFile;
@@ -50,4 +51,24 @@ public interface DatFileService {
      * 下载文件。
      */
     void download(Long id, HttpServletResponse response);
+
+    /**
+     * 检查用户是否可在指定部门目录下新建（仅本部门）。
+     */
+    boolean canCreate(Long targetDeptId, LoginUser user);
+
+    /**
+     * 覆盖已存在文件的内容（WebDAV PUT 保存），不改动 deptId。
+     */
+    void writeContent(Long fileId, java.io.InputStream in, LoginUser user);
+
+    /**
+     * 检查写权限（WebDAV LOCK/PUT 校验用）。
+     */
+    boolean canWrite(DatFile file, LoginUser user);
+
+    /**
+     * 检查读权限（WebDAV PROPFIND/GET 校验用，含祖先共享继承）。
+     */
+    boolean canAccess(DatFile file, LoginUser user);
 }

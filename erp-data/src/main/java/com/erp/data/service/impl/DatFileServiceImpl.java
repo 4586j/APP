@@ -85,33 +85,56 @@ public class DatFileServiceImpl implements DatFileService {
         return rows.stream().map(r -> ((Number) r.get("id")).longValue()).collect(Collectors.toList());
     }
 
-    /** 检查用户是否有权限访问该文件/文件夹。 */
-    private boolean canAccess(DatFile file, LoginUser user) {
+    /** 检查用户是否有权限访问该文件/文件夹（含祖先共享继承）。 */
+    @Override
+    public boolean canAccess(DatFile file, LoginUser user) {
         if (file == null || user == null) return false;
-        // 管理员全部可见
         if (user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN")) return true;
-        // 自己上传的
         if (user.getId() != null && user.getId().equals(file.getCreatedBy())) return true;
-        // 同部门及下级部门的
         if (file.getDeptId() != null && user.getDepartmentId() != null) {
             List<Long> visibleDeptIds = getDeptAndDescendantIds(user.getDepartmentId());
             if (visibleDeptIds.contains(file.getDeptId())) return true;
         }
-        // 共享给本部门的
-        if (file.getId() != null && user.getDepartmentId() != null) {
-            List<Long> sharedDeptIds = shareMapper.selectDeptIdsByFileId(file.getId());
-            if (sharedDeptIds.contains(user.getDepartmentId())) return true;
-        }
+        if (user.getDepartmentId() != null && isSharedToMe(file, user.getDepartmentId())) return true;
         return false;
     }
 
-    /** 检查用户是否有写入权限（同部门可写）。 */
-    private boolean canWrite(DatFile file, LoginUser user) {
+    /** 检查用户是否有写入权限：本部门 OR 文件/祖先共享给本部门 OR 自己创建。 */
+    @Override
+    public boolean canWrite(DatFile file, LoginUser user) {
+        if (file == null || user == null) return false;
         if (user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN")) return true;
         if (user.getId() != null && user.getId().equals(file.getCreatedBy())) return true;
-        if (file.getDeptId() != null && user.getDepartmentId() != null
-            && file.getDeptId().equals(user.getDepartmentId())) return true;
+        if (file.getDeptId() != null && file.getDeptId().equals(user.getDepartmentId())) return true;
+        if (user.getDepartmentId() != null && isSharedToMe(file, user.getDepartmentId())) return true;
         return false;
+    }
+
+    @Override
+    public boolean canCreate(Long targetDeptId, LoginUser user) {
+        if (user == null) return false;
+        if (user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN")) return true;
+        return targetDeptId != null && targetDeptId.equals(user.getDepartmentId());
+    }
+
+    /** 文件本身或任一祖先被共享给本部门。 */
+    private boolean isSharedToMe(DatFile file, Long myDeptId) {
+        if (file == null || file.getId() == null) return false;
+        if (shareMapper.selectDeptIdsByFileId(file.getId()).contains(myDeptId)) return true;
+        List<Long> ancestorIds = parseAncestorIds(file.getPath());
+        if (ancestorIds.isEmpty()) return false;
+        return !mapper.selectSharedFileIdsIn(ancestorIds, myDeptId).isEmpty();
+    }
+
+    /** "/3/15/42/" → [3, 15, 42]。 */
+    private List<Long> parseAncestorIds(String path) {
+        if (path == null || path.isBlank()) return List.of();
+        List<Long> ids = new ArrayList<>();
+        for (String seg : path.split("/")) {
+            if (seg.isBlank()) continue;
+            try { ids.add(Long.valueOf(seg)); } catch (NumberFormatException ignore) {}
+        }
+        return ids;
     }
 
     private DatFileVO toVO(DatFile e) {
@@ -223,21 +246,21 @@ public class DatFileServiceImpl implements DatFileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createFolder(Long parentId, String name, LoginUser user) {
-        // 如果指定了父目录，检查权限
-        if (parentId != null) {
-            DatFile parent = mapper.selectById(parentId);
-            if (parent == null) throw new BusinessException(R.CODE_NOT_FOUND, "父目录不存在");
-            if (!canWrite(parent, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权在此目录下创建");
-        }
+        DatFile parent = parentId == null ? null : mapper.selectById(parentId);
+        if (parentId != null && parent == null) throw new BusinessException(R.CODE_NOT_FOUND, "父目录不存在");
+        if (parentId != null && !canWrite(parent, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权在此目录下创建");
 
         DatFile f = new DatFile();
         f.setParentId(parentId);
         f.setIsDirectory(1);
         f.setName(name);
         f.setDisplayName(name);
-        f.setDeptId(user.getDepartmentId());
+        f.setDeptId(parent == null ? user.getDepartmentId() : parent.getDeptId());
         f.setCreatedBy(user.getId());
         mapper.insert(f);
+        String parentPath = parent == null ? "/" : parent.getPath();
+        f.setPath(parentPath + f.getId() + "/");
+        mapper.updateById(f);
         return f.getId();
     }
 
@@ -250,11 +273,9 @@ public class DatFileServiceImpl implements DatFileService {
         }
 
         // 检查父目录权限
-        if (parentId != null) {
-            DatFile parent = mapper.selectById(parentId);
-            if (parent == null) throw new BusinessException(R.CODE_NOT_FOUND, "父目录不存在");
-            if (!canWrite(parent, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权在此目录下上传");
-        }
+        DatFile parent = parentId == null ? null : mapper.selectById(parentId);
+        if (parentId != null && parent == null) throw new BusinessException(R.CODE_NOT_FOUND, "父目录不存在");
+        if (parentId != null && !canWrite(parent, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权在此目录下上传");
 
         String originalName = StringUtils.cleanPath(
             file.getOriginalFilename() == null ? "upload.bin" : file.getOriginalFilename());
@@ -289,6 +310,11 @@ public class DatFileServiceImpl implements DatFileService {
         f.setDeptId(deptId);
         f.setCreatedBy(user.getId());
         mapper.insert(f);
+
+        // 维护 path
+        String parentPath = parent == null ? "/" : parent.getPath();
+        f.setPath(parentPath + f.getId() + "/");
+        mapper.updateById(f);
 
         // 保存共享部门
         saveShareDepts(f.getId(), shareDeptIds);
@@ -329,18 +355,24 @@ public class DatFileServiceImpl implements DatFileService {
         if (f == null || f.getDeleted() == 1) throw new BusinessException(R.CODE_NOT_FOUND, "文件不存在");
         if (!canWrite(f, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权移动");
 
-        // 检查目标目录
+        DatFile target = null;
         if (targetParentId != null) {
-            DatFile target = mapper.selectById(targetParentId);
+            target = mapper.selectById(targetParentId);
             if (target == null || target.getIsDirectory() != 1) {
                 throw new BusinessException(R.CODE_PARAM_INVALID, "目标目录不存在或不是文件夹");
             }
             if (!canWrite(target, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权写入目标目录");
         }
 
+        String oldPrefix = f.getPath();
+        String newPrefix = (target == null ? "/" : target.getPath()) + f.getId() + "/";
+        f.setPath(newPrefix);
         f.setParentId(targetParentId);
         f.setUpdatedBy(user.getId());
         mapper.updateById(f);
+        if (f.getIsDirectory() != null && f.getIsDirectory() == 1) {
+            mapper.updatePathPrefix(oldPrefix, newPrefix);
+        }
     }
 
     // ==================== 删除 ====================
@@ -387,6 +419,37 @@ public class DatFileServiceImpl implements DatFileService {
             response.flushBuffer();
         } catch (IOException ex) {
             throw new IllegalStateException("file download failed", ex);
+        }
+    }
+
+    // ==================== 覆写内容 ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void writeContent(Long fileId, java.io.InputStream in, LoginUser user) {
+        DatFile f = mapper.selectById(fileId);
+        if (f == null || f.getDeleted() == 1) {
+            throw new BusinessException(R.CODE_NOT_FOUND, "文件不存在");
+        }
+        if (f.getIsDirectory() == 1) {
+            throw new BusinessException(R.CODE_PARAM_INVALID, "不能写入文件夹");
+        }
+        if (!canWrite(f, user)) {
+            throw new BusinessException(R.CODE_FORBIDDEN, "无权修改该文件");
+        }
+        java.nio.file.Path target = java.nio.file.Path.of(f.getStoragePath());
+        try {
+            java.nio.file.Files.createDirectories(target.getParent());
+            long size;
+            try (java.io.OutputStream out = java.nio.file.Files.newOutputStream(target,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)) {
+                size = in.transferTo(out);
+            }
+            f.setFileSize(size);
+            f.setUpdatedBy(user.getId());
+            mapper.updateById(f);
+        } catch (java.io.IOException ex) {
+            throw new IllegalStateException("文件保存失败", ex);
         }
     }
 }
