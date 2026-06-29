@@ -19,7 +19,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import lombok.extern.slf4j.Slf4j;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -43,7 +42,6 @@ import java.util.Map;
  * {@link UserDetailsLoader} 重加载（复刻 CurrentUserArgumentResolver 逻辑）。
  */
 @Component
-@Slf4j
 @RequiredArgsConstructor
 public class WebDavController extends HttpServlet {
 
@@ -57,7 +55,6 @@ public class WebDavController extends HttpServlet {
     // ========== 单入口分发：重写 service() 接收所有 HTTP 方法（含 PROPFIND 等） ==========
     @Override
     protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        log.warn("[WebDAV-CTRL] {} {} (enter servlet)", request.getMethod(), request.getRequestURI());
         LoginUser user = currentUser();
         switch (request.getMethod()) {
             case "OPTIONS" -> options(response);
@@ -217,6 +214,13 @@ public class WebDavController extends HttpServlet {
                 return;
             }
             fileService.move(src.getDatFile().getId(), parentFolderId(destParent), user);
+            // WebDAV MOVE 含重命名语义：Destination 末段为新名字，与原名不同则改名
+            String newName = lastSegment(destPath);
+            String oldName = src.getDatFile().getDisplayName() != null
+                    ? src.getDatFile().getDisplayName() : src.getDatFile().getName();
+            if (newName != null && !newName.isEmpty() && !newName.equals(oldName)) {
+                fileService.rename(src.getDatFile().getId(), newName, user);
+            }
             response.setStatus(201);
         } catch (BusinessException ex) {
             WebDavErrors.write(response, ex);

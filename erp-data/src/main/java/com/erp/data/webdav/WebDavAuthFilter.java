@@ -17,7 +17,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import lombok.extern.slf4j.Slf4j;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
@@ -25,7 +24,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** Basic Auth → SecurityContext（WebDAV 专用）。 */
-@Slf4j
 @Component
 public class WebDavAuthFilter extends OncePerRequestFilter {
 
@@ -41,7 +39,6 @@ public class WebDavAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(@NonNull HttpServletRequest request,
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain chain) throws ServletException, IOException {
-        log.warn("[WebDAV-FILTER] {} {} (enter filter)", request.getMethod(), request.getRequestURI());
         String header = request.getHeader("Authorization");
         if (StringUtils.hasText(header) && header.startsWith("Basic ")) {
             if (tryAuthenticate(header.substring(6).trim())) {
