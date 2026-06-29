@@ -1,103 +1,117 @@
 package com.erp.web.webdav;
 
-import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import com.erp.data.service.DatFileService;
 import com.erp.data.webdav.ResolvedPath;
+import com.erp.data.webdav.WebDavController;
+import com.erp.data.webdav.WebDavLockStore;
 import com.erp.data.webdav.WebDavPathResolver;
+import com.erp.data.webdav.WebDavPropFindXmlBuilder;
+import com.erp.security.user.LoginUser;
+import com.erp.security.user.UserDetailsLoader;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * WebDAV 协议动词 → 状态码/XML 集成测试。
+ * WebDavController 协议动词分发单测。
  *
- * <p>沿用 erp-web 既有测试的上下文裁剪方式（排除数据源/Flyway/MyBatis，内存用户）。
- * 注意：本环境因 erp-product 模块 mapper 依赖，全上下文 @SpringBootTest 暂无法加载
- * （与 AuthControllerTest 同一预先存在的环境限制）；在具备完整测试上下文的环境中可运行。
+ * <p>直接构造 MockHttpServletRequest 调用 {@link WebDavController#handleRequest}，
+ * 验证各 WebDAV 动词（含 PROPFIND/MKCOL 等非标准方法）的状态码映射——
+ * 这是 {@code @RequestMapping} 架构无法覆盖的（Spring MVC 对非标准方法返回 400）。
+ * 鉴权 401 由 WebDavAuthFilter 负责，已在 erp-data 层外，此处聚焦 controller 分发。
  */
-@AutoConfigureMockMvc
-@EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class, FlywayAutoConfiguration.class,
-        HibernateJpaAutoConfiguration.class, MybatisPlusAutoConfiguration.class})
-@ActiveProfiles("dev")
-@org.springframework.test.context.TestPropertySource(properties = "erp.user.persistence=memory")
-@SpringBootTest
 class WebDavControllerTest {
 
-    @Autowired MockMvc m;
-    @MockBean DatFileService fileService;
-    @MockBean WebDavPathResolver resolver;
-    @MockBean JdbcTemplate jdbcTemplate;
+    private final WebDavPathResolver resolver = mock(WebDavPathResolver.class);
+    private final DatFileService fileService = mock(DatFileService.class);
+    private final WebDavPropFindXmlBuilder xmlBuilder = new WebDavPropFindXmlBuilder();
+    private final WebDavLockStore lockStore = new WebDavLockStore();
+    private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+    private final UserDetailsLoader userDetailsLoader = mock(UserDetailsLoader.class);
 
-    private String basic(String user, String pass) {
-        return "Basic " + Base64.getEncoder().encodeToString((user + ":" + pass).getBytes(StandardCharsets.UTF_8));
+    private final WebDavController controller = new WebDavController(
+            resolver, fileService, xmlBuilder, lockStore, jdbcTemplate, userDetailsLoader);
+
+    private LoginUser admin() {
+        return LoginUser.builder().id(1L).username("admin").departmentId(1L)
+                .roles(List.of("ROLE_ADMIN")).build();
+    }
+
+    private void loginAs(LoginUser user) {
+        when(userDetailsLoader.loadByUsername("admin")).thenReturn(user);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("admin", null, List.of()));
+    }
+
+    @AfterEach
+    void clear() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private MockHttpServletResponse handle(String method, String uri) throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setMethod(method);
+        req.setRequestURI(uri);
+        if ("PROPFIND".equals(method)) {
+            req.setContentType("application/xml");
+            req.setContent("<x/>".getBytes());
+        }
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        controller.handleRequest(req, resp);
+        return resp;
     }
 
     @Test
-    void noAuth_returns401() throws Exception {
-        m.perform(propfind("/webdav/")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void wrongPassword_returns401() throws Exception {
-        m.perform(propfind("/webdav/").header("Authorization", basic("admin", "wrong")))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void options_returnsDavHeader() throws Exception {
-        m.perform(request("OPTIONS", "/webdav/").header("Authorization", basic("admin", "admin123")))
-                .andExpect(status().isOk())
-                .andExpect(header().string("DAV", "1,2"));
+    void options_returns200AndDavHeader() throws Exception {
+        loginAs(admin());
+        MockHttpServletResponse resp = handle("OPTIONS", "/webdav/");
+        assertEquals(200, resp.getStatus());
+        assertEquals("1,2", resp.getHeader("DAV"));
     }
 
     @Test
     void propfind_root_returns207() throws Exception {
+        loginAs(admin());
         when(resolver.resolve(any(), any())).thenReturn(ResolvedPath.root("/webdav/"));
         when(fileService.listFiles(any(), any())).thenReturn(List.of());
-        m.perform(propfind("/webdav/").header("Authorization", basic("admin", "admin123")))
-                .andExpect(status().is(207))
-                .andExpect(content().contentTypeCompatibleWith("application/xml"));
+        when(jdbcTemplate.queryForList(any(String.class))).thenReturn(List.of());
+        MockHttpServletResponse resp = handle("PROPFIND", "/webdav/");
+        assertEquals(207, resp.getStatus());
+        assertTrue(resp.getContentType().startsWith("application/xml"));
     }
 
     @Test
     void propfind_notFound_returns404() throws Exception {
+        loginAs(admin());
         when(resolver.resolve(any(), any())).thenReturn(ResolvedPath.notFound("/webdav/x/"));
-        m.perform(propfind("/webdav/x/").header("Authorization", basic("admin", "admin123")))
-                .andExpect(status().isNotFound());
+        MockHttpServletResponse resp = handle("PROPFIND", "/webdav/x/");
+        assertEquals(404, resp.getStatus());
     }
 
     @Test
     void mkcol_forbidden_returns403() throws Exception {
+        loginAs(admin());
         when(resolver.resolve(any(), any())).thenReturn(ResolvedPath.root("/webdav/"));
         when(fileService.canCreate(any(), any())).thenReturn(false);
-        m.perform(request("MKCOL", "/webdav/销售部/新文件夹").header("Authorization", basic("admin", "admin123")))
-                .andExpect(status().isForbidden());
+        MockHttpServletResponse resp = handle("MKCOL", "/webdav/销售部/新文件夹");
+        assertEquals(403, resp.getStatus());
     }
 
-    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder propfind(String url) {
-        return request("PROPFIND", url).contentType(MediaType.APPLICATION_XML).content("<x/>");
-    }
-
-    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request(String method, String url) {
-        return org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(
-                org.springframework.http.HttpMethod.valueOf(method), url);
+    @Test
+    void unknownMethod_returns405() throws Exception {
+        loginAs(admin());
+        MockHttpServletResponse resp = handle("TRACE", "/webdav/");
+        assertEquals(405, resp.getStatus());
     }
 }

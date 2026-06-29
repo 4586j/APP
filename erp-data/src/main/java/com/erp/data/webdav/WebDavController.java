@@ -6,14 +6,16 @@ import com.erp.data.dto.DatFileQuery;
 import com.erp.data.dto.DatFileVO;
 import com.erp.data.entity.DatFile;
 import com.erp.data.service.DatFileService;
-import com.erp.security.annotation.CurrentUser;
 import com.erp.security.user.LoginUser;
+import com.erp.security.user.UserDetailsLoader;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.HttpRequestHandler;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -26,24 +28,29 @@ import java.util.Map;
 /**
  * WebDAV 协议处理器（OPTIONS/PROPFIND/GET/PUT/MKCOL/DELETE/MOVE/LOCK/UNLOCK）。
  *
- * <p>因 Spring {@code RequestMethod} 枚举不含 WebDAV 动词，采用单入口分发：
- * 一个 {@code @RequestMapping("/**")} 方法按 {@code request.getMethod()} 分发。
+ * <p>实现 {@link HttpRequestHandler} 并由 {@link WebDavHandlerMapping} 注册到 /webdav/**，
+ * <b>不使用 {@code @RequestMapping}</b>：Spring MVC 的 RequestMappingHandlerMapping
+ * 只识别标准 HttpMethod，对 PROPFIND/MKCOL/LOCK 等非标准方法会直接返回 400，
+ * 无法到达 controller。原生 handler 按 {@code request.getMethod()} 自行分发，绕开此限制。
+ *
+ * <p>当前用户从 SecurityContext 取 username 后调 {@link UserDetailsLoader} 重加载
+ * （复刻 {@code CurrentUserArgumentResolver} 逻辑，因原生 handler 不走参数解析器）。
  */
-@RestController
+@Component
 @RequiredArgsConstructor
-public class WebDavController {
+public class WebDavController implements HttpRequestHandler {
 
     private final WebDavPathResolver resolver;
     private final DatFileService fileService;
     private final WebDavPropFindXmlBuilder xmlBuilder;
     private final WebDavLockStore lockStore;
     private final JdbcTemplate jdbcTemplate;
+    private final UserDetailsLoader userDetailsLoader;
 
     // ========== 单入口分发 ==========
-    // 同时覆盖根 /webdav 与任意子路径 /webdav/...，method 不限定，按 request.getMethod() 分发
-    @RequestMapping({"/webdav", "/webdav/**"})
-    public void dispatch(HttpServletRequest request, HttpServletResponse response,
-                         @CurrentUser LoginUser user) throws IOException {
+    @Override
+    public void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        LoginUser user = currentUser();
         switch (request.getMethod()) {
             case "OPTIONS" -> options(response);
             case "PROPFIND" -> propfind(request, response, user);
@@ -245,6 +252,21 @@ public class WebDavController {
     }
 
     // ========== 辅助 ==========
+    /** 从 SecurityContext 取 username 后重加载 LoginUser（复刻 CurrentUserArgumentResolver）。 */
+    private LoginUser currentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            return null;
+        }
+        Object principal = auth.getPrincipal();
+        String username = principal instanceof String s ? s : auth.getName();
+        try {
+            return userDetailsLoader.loadByUsername(username);
+        } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ex) {
+            return null;
+        }
+    }
+
     private String lockTokenHeader(HttpServletRequest req) {
         String t = req.getHeader("Lock-Token");
         if (t == null) return null;
