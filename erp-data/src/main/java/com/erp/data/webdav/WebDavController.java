@@ -30,7 +30,6 @@ import java.util.Map;
  * 一个 {@code @RequestMapping("/**")} 方法按 {@code request.getMethod()} 分发。
  */
 @RestController
-@RequestMapping("/webdav")
 @RequiredArgsConstructor
 public class WebDavController {
 
@@ -41,7 +40,8 @@ public class WebDavController {
     private final JdbcTemplate jdbcTemplate;
 
     // ========== 单入口分发 ==========
-    @RequestMapping("/**")
+    // 同时覆盖根 /webdav 与任意子路径 /webdav/...，method 不限定，按 request.getMethod() 分发
+    @RequestMapping({"/webdav", "/webdav/**"})
     public void dispatch(HttpServletRequest request, HttpServletResponse response,
                          @CurrentUser LoginUser user) throws IOException {
         switch (request.getMethod()) {
