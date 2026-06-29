@@ -171,7 +171,7 @@ public class WebDavController extends HttpServlet {
                 WebDavErrors.write(response, new BusinessException(R.CODE_FORBIDDEN, "无权创建文件夹"));
                 return;
             }
-            fileService.createFolder(parentFolderId(parent), lastSegment(request.getRequestURI()), user);
+            fileService.createFolder(parentFolderId(parent), lastSegment(request.getRequestURI()), parentDeptId(parent), user);
             response.setStatus(201);
         } catch (BusinessException ex) {
             int sc = WebDavErrors.statusCode(ex);
@@ -279,10 +279,35 @@ public class WebDavController extends HttpServlet {
         }
     }
 
+    /**
+     * 提取锁 token。
+     * <p>UNLOCK 用 Lock-Token 头（{@code Lock-Token: <token>}）；
+     * 覆盖写入（PUT）/删除（DELETE）/移动（MOVE）时客户端把 token 放在 If 头
+     * （{@code If: (<token>)}，可能带资源 tag {@code <uri> (<token>)}）。
+     * 两种头都解析，任一命中即返回。
+     */
     private String lockTokenHeader(HttpServletRequest req) {
-        String t = req.getHeader("Lock-Token");
-        if (t == null) return null;
-        return t.replace("<", "").replace(">", "").trim();
+        String lockToken = req.getHeader("Lock-Token");
+        if (lockToken != null) {
+            String t = stripAngles(lockToken).trim();
+            if (!t.isEmpty()) return t;
+        }
+        String ifHeader = req.getHeader("If");
+        if (ifHeader != null) {
+            int parenStart = ifHeader.indexOf('(');
+            if (parenStart >= 0) {
+                int parenEnd = ifHeader.indexOf(')', parenStart);
+                if (parenEnd > parenStart) {
+                    String t = stripAngles(ifHeader.substring(parenStart + 1, parenEnd)).trim();
+                    if (!t.isEmpty()) return t;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String stripAngles(String s) {
+        return s.replace("<", "").replace(">", "");
     }
 
     /** 把 URI 每段重新 URL 编码，作为 PROPFIND basePath（XmlBuilder 拼接 href 时不再编码 basePath）。 */

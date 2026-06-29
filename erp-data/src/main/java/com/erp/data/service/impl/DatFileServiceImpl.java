@@ -252,17 +252,21 @@ public class DatFileServiceImpl implements DatFileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long createFolder(Long parentId, String name, LoginUser user) {
+    public Long createFolder(Long parentId, String name, Long deptId, LoginUser user) {
         DatFile parent = parentId == null ? null : mapper.selectById(parentId);
         if (parentId != null && parent == null) throw new BusinessException(R.CODE_NOT_FOUND, "父目录不存在");
         if (parentId != null && !canWrite(parent, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权在此目录下创建");
+
+        // 归属部门：显式传入优先（WebDAV 部门根），否则父目录部门，再否则用户本部门
+        Long effectiveDeptId = deptId != null ? deptId
+                : (parent != null ? parent.getDeptId() : user.getDepartmentId());
 
         DatFile f = new DatFile();
         f.setParentId(parentId);
         f.setIsDirectory(1);
         f.setName(name);
         f.setDisplayName(name);
-        f.setDeptId(parent == null ? user.getDepartmentId() : parent.getDeptId());
+        f.setDeptId(effectiveDeptId);
         f.setCreatedBy(user.getId());
         mapper.insert(f);
         String parentPath = parent == null ? "/" : parent.getPath();
@@ -391,6 +395,10 @@ public class DatFileServiceImpl implements DatFileService {
         if (f == null || f.getDeleted() == 1) throw new BusinessException(R.CODE_NOT_FOUND, "文件不存在");
         if (!canWrite(f, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权删除");
 
+        // 文件夹：沿 path 前缀递归软删自身 + 所有后代
+        if (f.getIsDirectory() != null && f.getIsDirectory() == 1 && f.getPath() != null) {
+            mapper.softDeleteByPathPrefix(f.getPath());
+        }
         f.setDeleted(1);
         f.setUpdatedBy(user.getId());
         mapper.updateById(f);

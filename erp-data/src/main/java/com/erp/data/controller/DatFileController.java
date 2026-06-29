@@ -47,7 +47,7 @@ public class DatFileController {
     public R<Long> createFolder(@RequestParam(required = false) Long parentId,
                                  @RequestParam String name,
                                  @CurrentUser LoginUser user) {
-        return R.ok(service.createFolder(parentId, name, user));
+        return R.ok(service.createFolder(parentId, name, null, user));
     }
 
     /**

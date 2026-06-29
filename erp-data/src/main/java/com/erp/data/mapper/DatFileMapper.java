@@ -77,4 +77,14 @@ public interface DatFileMapper extends BaseMapper<DatFile> {
     @Update("UPDATE dat_file SET path = CONCAT(#{newPrefix}, SUBSTRING(path, LENGTH(#{oldPrefix}) + 1)) " +
             "WHERE path LIKE CONCAT(#{oldPrefix}, '%')")
     int updatePathPrefix(@Param("oldPrefix") String oldPrefix, @Param("newPrefix") String newPrefix);
+
+    /**
+     * 软删除某路径前缀下的所有记录（自身 + 全部后代）。
+     * pathPrefix 形如 "/3/15/"，{@code LIKE '/3/15/%'} 同时匹配自身 "/3/15/" 与后代。
+     *
+     * @param pathPrefix 文件夹自身的 path（含末尾斜杠）
+     * @return 受影响行数
+     */
+    @Update("UPDATE dat_file SET deleted = 1 WHERE path LIKE CONCAT(#{pathPrefix}, '%') AND deleted = 0")
+    int softDeleteByPathPrefix(@Param("pathPrefix") String pathPrefix);
 }
