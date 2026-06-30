@@ -73,8 +73,9 @@ public class WebDavController extends HttpServlet {
     // ========== OPTIONS ==========
     private void options(HttpServletResponse response) {
         response.setHeader("DAV", "1,2");
-        response.setHeader("Allow",
-                "OPTIONS, PROPFIND, GET, PUT, MKCOL, DELETE, MOVE, LOCK, UNLOCK");
+        String methods = "OPTIONS, PROPFIND, GET, PUT, MKCOL, DELETE, MOVE, LOCK, UNLOCK";
+        response.setHeader("Allow", methods);
+        response.setHeader("Public", methods);
         response.setHeader("MS-Author-Via", "DAV");
         response.setStatus(200);
     }
@@ -84,18 +85,21 @@ public class WebDavController extends HttpServlet {
                           LoginUser user) throws IOException {
         try {
             ResolvedPath rp = resolver.resolve(request.getRequestURI(), user);
+            boolean depthZero = "0".equals(request.getHeader("Depth"));
             List<DatFile> children = List.of();
             List<WebDavPropFindXmlBuilder.VirtualDept> depts = List.of();
             switch (rp.getType()) {
                 case ROOT -> {
                     children = List.of();
-                    depts = listVisibleDepts(user);
+                    depts = depthZero ? List.of() : listVisibleDepts(user);
                 }
                 case DEPT_ROOT -> {
-                    children = filterVisible(fileService.listFiles(deptRootQuery(rp.getDeptId()), user));
+                    children = depthZero ? List.of()
+                            : filterVisible(fileService.listFiles(deptRootQuery(rp.getDeptId()), user));
                 }
                 case FOLDER -> {
-                    children = filterVisible(fileService.listFiles(folderQuery(rp.getDatFile().getId()), user));
+                    children = depthZero ? List.of()
+                            : filterVisible(fileService.listFiles(folderQuery(rp.getDatFile().getId()), user));
                 }
                 case FILE -> { children = List.of(rp.getDatFile()); }
                 case NOT_FOUND -> { response.setStatus(404); return; }

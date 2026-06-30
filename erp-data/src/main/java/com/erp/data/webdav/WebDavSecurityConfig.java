@@ -55,6 +55,16 @@ public class WebDavSecurityConfig {
     }
 
     @Bean
+    public FilterRegistrationBean<WebDavWindowsOptionsFilter> webDavWindowsOptionsFilterRegistration() {
+        FilterRegistrationBean<WebDavWindowsOptionsFilter> reg =
+                new FilterRegistrationBean<>(new WebDavWindowsOptionsFilter());
+        reg.setName("webDavWindowsOptionsFilter");
+        reg.addUrlPatterns("/*");
+        reg.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        return reg;
+    }
+
+    @Bean
     public StrictHttpFirewall webDavHttpFirewall() {
         StrictHttpFirewall firewall = new StrictHttpFirewall();
         firewall.setAllowedHttpMethods(List.of(
