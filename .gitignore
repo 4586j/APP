@@ -5,6 +5,7 @@ guide/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+.md
 
 ### STS ###
 .apt_generated
