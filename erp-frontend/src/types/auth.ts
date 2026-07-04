@@ -22,6 +22,7 @@ export interface UserInfo {
   realName: string
   department: string
   departmentName?: string
+  departmentId?: number
   roles: string[]
   permissions: string[]
   // 前端可选扩展字段（后端尚未返回）

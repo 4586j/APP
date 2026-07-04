@@ -94,8 +94,19 @@ public class UserServiceImpl implements UserService {
             return new ArrayList<>(new HashSet<>(permissionMapper.selectPermissionsByUserId(userId)));
         }
 
-        // 非管理员（部长/部员）：从部门用户权限表获取权限
-        return deptUserPermMapper.selectPermissionCodesByUserId(userId);
+        // 非管理员（部长/部员）：个人在部门下被分配的权限，且不能超过部门权限上限。
+        SysUser user = userMapper.selectById(userId);
+        if (user == null || user.getDepartmentId() == null) {
+            return List.of();
+        }
+        Set<String> deptPermissions = new HashSet<>(deptPermMapper.selectPermissionCodesByDeptId(user.getDepartmentId()));
+        if (deptPermissions.isEmpty()) {
+            return List.of();
+        }
+        Set<String> assignedPermissions = new HashSet<>(
+                deptUserPermMapper.selectPermissionCodesByUserAndDept(userId, user.getDepartmentId()));
+        assignedPermissions.retainAll(deptPermissions);
+        return new ArrayList<>(assignedPermissions);
     }
 
     @Override public Page<UserVO> pageUsers(UserQuery query) {
@@ -103,6 +114,7 @@ public class UserServiceImpl implements UserService {
         LambdaQueryWrapper<SysUser> w = new LambdaQueryWrapper<>();
         if (query.getUsername() != null) w.like(SysUser::getUsername, query.getUsername());
         if (query.getRealName() != null) w.like(SysUser::getRealName, query.getRealName());
+        if (query.getDepartmentId() != null) w.eq(SysUser::getDepartmentId, query.getDepartmentId());
         if (query.getStatus() != null) w.eq(SysUser::getStatus, query.getStatus());
 
         // 按角色过滤

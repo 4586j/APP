@@ -21,6 +21,7 @@ public class UserInfo {
     private String realName;
     private String department;
     private String departmentName;
+    private Long departmentId;
     private List<String> roles;
     private List<String> permissions;
 }

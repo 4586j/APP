@@ -258,9 +258,17 @@ public class DatFileServiceImpl implements DatFileService {
         if (parentId != null && parent == null) throw new BusinessException(R.CODE_NOT_FOUND, "父目录不存在");
         if (parentId != null && !canWrite(parent, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权在此目录下创建");
 
-        // 归属部门：显式传入优先（WebDAV 部门根），否则父目录部门，再否则用户本部门
-        Long effectiveDeptId = deptId != null ? deptId
-                : (parent != null ? parent.getDeptId() : user.getDepartmentId());
+        // 归属部门：有父目录时必须继承父目录；根目录下才使用显式部门或用户本部门。
+        Long effectiveDeptId = parent != null ? parent.getDeptId()
+                : (deptId != null ? deptId : user.getDepartmentId());
+        if (parentId == null && !canCreate(effectiveDeptId, user)) {
+            throw new BusinessException(R.CODE_FORBIDDEN, "无权在此部门下创建");
+        }
+        Long existingId = findExistingFolder(parentId, effectiveDeptId, name);
+        if (existingId != null) {
+            saveShareDepts(existingId, shareDeptIds);
+            return existingId;
+        }
 
         DatFile f = new DatFile();
         f.setParentId(parentId);
@@ -276,6 +284,26 @@ public class DatFileServiceImpl implements DatFileService {
         // 保存共享部门（文件夹上传时为每级目录写入，使共享部门可见整棵子树）
         saveShareDepts(f.getId(), shareDeptIds);
         return f.getId();
+    }
+
+    private Long findExistingFolder(Long parentId, Long deptId, String name) {
+        List<DatFile> siblings;
+        if (parentId != null) {
+            siblings = mapper.selectByParentId(parentId);
+        } else if (deptId != null) {
+            siblings = mapper.selectRootFilesByDeptId(deptId);
+        } else {
+            siblings = mapper.selectRootFiles();
+        }
+        for (DatFile f : siblings) {
+            if (f.getIsDirectory() != null && f.getIsDirectory() == 1) {
+                String existingName = f.getDisplayName() != null ? f.getDisplayName() : f.getName();
+                if (Objects.equals(existingName, name)) {
+                    return f.getId();
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -299,8 +327,14 @@ public class DatFileServiceImpl implements DatFileService {
         int dot = safeName.lastIndexOf('.');
         if (dot >= 0) suffix = safeName.substring(dot);
 
+        Long effectiveDeptId = parent != null ? parent.getDeptId()
+                : (deptId != null ? deptId : user.getDepartmentId());
+        if (parentId == null && !canCreate(effectiveDeptId, user)) {
+            throw new BusinessException(R.CODE_FORBIDDEN, "无权在此部门下上传");
+        }
+
         // 物理存储：按部门/日期分片
-        Path deptDir = deptId != null ? uploadRoot.resolve(String.valueOf(deptId)) : uploadRoot.resolve("_common");
+        Path deptDir = effectiveDeptId != null ? uploadRoot.resolve(String.valueOf(effectiveDeptId)) : uploadRoot.resolve("_common");
         Path dayDir = deptDir.resolve(LocalDate.now().toString().replace("-", ""));
         String storedName = UUID.randomUUID() + suffix;
         Path target = dayDir.resolve(storedName).normalize();
@@ -322,7 +356,7 @@ public class DatFileServiceImpl implements DatFileService {
         f.setFileSize(file.getSize());
         f.setStoragePath(target.toString());
         f.setFileType(fileType);
-        f.setDeptId(deptId);
+        f.setDeptId(effectiveDeptId);
         f.setCreatedBy(user.getId());
         mapper.insert(f);
 
@@ -340,12 +374,15 @@ public class DatFileServiceImpl implements DatFileService {
     private void saveShareDepts(Long fileId, List<Long> deptIds) {
         log.info("saveShareDepts: fileId={}, deptIds={}", fileId, deptIds);
         if (deptIds != null && !deptIds.isEmpty()) {
+            Set<Long> existing = new HashSet<>(shareMapper.selectDeptIdsByFileId(fileId));
             for (Long sid : deptIds) {
                 if (sid == null) continue;
+                if (existing.contains(sid)) continue;
                 DatFileShare s = new DatFileShare();
                 s.setFileId(fileId);
                 s.setDeptId(sid);
                 shareMapper.insert(s);
+                existing.add(sid);
             }
         }
     }

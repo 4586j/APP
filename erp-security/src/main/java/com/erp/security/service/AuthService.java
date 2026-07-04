@@ -195,12 +195,7 @@ public class AuthService {
         String newAccess = jwtTokenProvider.generateAccessToken(userId, username, refreshedRoles, refreshedPermissions);
         String newRefresh = jwtTokenProvider.generateRefreshToken(userId, username, refreshedRoles);
 
-        UserInfo info = UserInfo.builder()
-                .id(userId)
-                .username(username)
-                .roles(refreshedRoles)
-                .permissions(refreshedPermissions)
-                .build();
+        UserInfo info = toUserInfo(refreshedUser);
         return LoginResponse.builder()
                 .accessToken(newAccess)
                 .refreshToken(newRefresh)
@@ -229,6 +224,7 @@ public class AuthService {
                 .realName(u.getRealName())
                 .department(u.getDepartment())
                 .departmentName(u.getDepartmentName())
+                .departmentId(u.getDepartmentId())
                 .roles(u.getRoles())
                 .permissions(u.getPermissions())
                 .build();

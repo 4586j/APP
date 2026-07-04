@@ -46,10 +46,11 @@ public class DatFileController {
     @PreAuthorize("hasAuthority('data:upload:create')")
     public R<Long> createFolder(@RequestParam(required = false) Long parentId,
                                  @RequestParam String name,
+                                 @RequestParam(required = false) Long deptId,
                                  @RequestParam(required = false) String shareDeptIds,
                                  @CurrentUser LoginUser user) {
         List<Long> ids = parseShareDeptIds(shareDeptIds);
-        return R.ok(service.createFolder(parentId, name, null, ids, user));
+        return R.ok(service.createFolder(parentId, name, deptId, ids, user));
     }
 
     /**

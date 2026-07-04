@@ -250,7 +250,7 @@
     <el-dialog v-model="singleUserPermVisible" :title="'权限配置 - ' + singleUserPermUser?.realName" width="500px" @closed="resetSingleUserPerm">
       <el-tree
         ref="userPermTreeRef"
-        :data="permTree"
+        :data="assignablePermTree"
         show-checkbox
         node-key="id"
         default-expand-all
@@ -540,12 +540,28 @@ const userPermDialogDeptId = ref<Id | undefined>(undefined)
 const userPermDialogDeptName = ref('')
 const deptUsers = ref<SystemUser[]>([])
 const userLoading = ref(false)
+const assignablePermTree = ref<PermissionNode[]>([])
+const assignablePermIds = ref<Set<Id>>(new Set())
+
+function filterPermissionTreeByIds(nodes: PermissionNode[], allowed: Set<Id>): PermissionNode[] {
+  const result: PermissionNode[] = []
+  for (const node of nodes || []) {
+    const children = filterPermissionTreeByIds(node.children || [], allowed)
+    if (allowed.has(node.id) || children.length > 0) {
+      result.push({ ...node, children })
+    }
+  }
+  return result
+}
 
 async function openUserPermDialog(row: any) {
   userPermDialogDeptId.value = row.id
   userPermDialogDeptName.value = row.name
   userPermDialogVisible.value = true
   await loadPermTreeIfNeeded()
+  const deptPermIds = await getDeptPermissionIds(row.id)
+  assignablePermIds.value = new Set(deptPermIds || [])
+  assignablePermTree.value = filterPermissionTreeByIds(permTree.value, assignablePermIds.value)
   await loadDeptUsers(row.id)
 }
 
@@ -566,6 +582,8 @@ function resetUserPermDialog() {
   userPermDialogDeptId.value = undefined
   userPermDialogDeptName.value = ''
   deptUsers.value = []
+  assignablePermTree.value = []
+  assignablePermIds.value = new Set()
 }
 
 // 单个用户权限编辑
@@ -599,6 +617,7 @@ async function saveUserPerm() {
     const checked = userPermTreeRef.value?.getCheckedKeys(false) || []
     const halfChecked = userPermTreeRef.value?.getHalfCheckedKeys?.() || []
     const permIds = Array.from(new Set([...checked, ...halfChecked]))
+      .filter((id) => assignablePermIds.value.has(id))
     await assignDeptUserPermissions(userPermDialogDeptId.value, singleUserPermUser.value.id, permIds)
     ElMessage.success('用户权限已保存')
     singleUserPermVisible.value = false

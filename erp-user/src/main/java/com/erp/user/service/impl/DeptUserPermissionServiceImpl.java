@@ -3,15 +3,20 @@ package com.erp.user.service.impl;
 import com.erp.common.exception.BusinessException;
 import com.erp.common.model.R;
 import com.erp.user.entity.SysDeptUserPermission;
+import com.erp.user.entity.SysUser;
 import com.erp.user.mapper.SysDeptUserPermissionMapper;
+import com.erp.user.mapper.SysDepartmentPermissionMapper;
 import com.erp.user.mapper.SysDepartmentMapper;
+import com.erp.user.mapper.SysUserMapper;
 import com.erp.user.service.DeptUserPermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -21,6 +26,8 @@ public class DeptUserPermissionServiceImpl implements DeptUserPermissionService 
 
     private final SysDeptUserPermissionMapper mapper;
     private final SysDepartmentMapper departmentMapper;
+    private final SysDepartmentPermissionMapper deptPermMapper;
+    private final SysUserMapper userMapper;
 
     @Override
     public List<Long> getPermissionIdsByUserAndDept(Long userId, Long deptId) {
@@ -32,6 +39,19 @@ public class DeptUserPermissionServiceImpl implements DeptUserPermissionService 
     public void assignPermissions(Long userId, Long deptId, List<Long> permissionIds, Long grantedBy) {
         if (departmentMapper.selectById(deptId) == null) {
             throw new BusinessException(R.CODE_NOT_FOUND, "department not found");
+        }
+        SysUser user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(R.CODE_NOT_FOUND, "user not found");
+        }
+        if (user.getDepartmentId() == null || !user.getDepartmentId().equals(deptId)) {
+            throw new BusinessException(R.CODE_FORBIDDEN, "user does not belong to this department");
+        }
+        if (permissionIds != null && !permissionIds.isEmpty()) {
+            Set<Long> deptPermissionIds = new HashSet<>(deptPermMapper.selectPermissionIdsByDeptId(deptId));
+            if (!deptPermissionIds.containsAll(permissionIds)) {
+                throw new BusinessException(R.CODE_FORBIDDEN, "permission exceeds department limit");
+            }
         }
         // 覆盖式分配：先删后插
         mapper.deleteByUserAndDept(userId, deptId);

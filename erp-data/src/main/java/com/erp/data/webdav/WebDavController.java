@@ -23,8 +23,10 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * WebDAV 协议处理器（OPTIONS/PROPFIND/GET/PUT/MKCOL/DELETE/MOVE/LOCK/UNLOCK）。
@@ -90,7 +92,7 @@ public class WebDavController extends HttpServlet {
             List<WebDavPropFindXmlBuilder.VirtualDept> depts = List.of();
             switch (rp.getType()) {
                 case ROOT -> {
-                    children = List.of();
+                    children = depthZero ? List.of() : listUnassignedRootFiles(user);
                     depts = depthZero ? List.of() : listVisibleDepts(user);
                 }
                 case DEPT_ROOT -> {
@@ -150,7 +152,7 @@ public class WebDavController extends HttpServlet {
             // 新文件：父必须是 FOLDER 或 DEPT_ROOT
             ResolvedPath parent = resolver.resolve(parentPath(request.getRequestURI()), user);
             Long parentDeptId = parentDeptId(parent);
-            if (!fileService.canCreate(parentDeptId, user)) {
+            if (!hasPermission(user, "data:upload:create") || !canCreateInParent(parent, user)) {
                 WebDavErrors.write(response, new BusinessException(R.CODE_FORBIDDEN, "无权在此目录上传"));
                 return;
             }
@@ -171,7 +173,7 @@ public class WebDavController extends HttpServlet {
         try {
             ResolvedPath parent = resolver.resolve(parentPath(request.getRequestURI()), user);
             Long parentDeptId = parentDeptId(parent);
-            if (!fileService.canCreate(parentDeptId, user)) {
+            if (!hasPermission(user, "data:upload:create") || !canCreateInParent(parent, user)) {
                 WebDavErrors.write(response, new BusinessException(R.CODE_FORBIDDEN, "无权创建文件夹"));
                 return;
             }
@@ -354,6 +356,23 @@ public class WebDavController extends HttpServlet {
         return null;
     }
 
+    private boolean canCreateInParent(ResolvedPath parent, LoginUser user) {
+        if (parent == null || user == null) return false;
+        if (parent.getType() == ResolvedPath.Type.DEPT_ROOT) {
+            return fileService.canCreate(parent.getDeptId(), user);
+        }
+        if (parent.getType() == ResolvedPath.Type.FOLDER && parent.getDatFile() != null) {
+            return fileService.canWrite(parent.getDatFile(), user);
+        }
+        return false;
+    }
+
+    private boolean hasPermission(LoginUser user, String permission) {
+        if (user == null) return false;
+        if (user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN")) return true;
+        return user.getPermissions() != null && user.getPermissions().contains(permission);
+    }
+
     private String stripHost(String url) {
         int idx = url.indexOf("/webdav");
         return idx >= 0 ? url.substring(idx) : url;
@@ -378,15 +397,21 @@ public class WebDavController extends HttpServlet {
             rows.addAll(jdbcTemplate.queryForList("SELECT id, dept_name FROM sys_department WHERE deleted = 0"));
         } else if (user.getDepartmentId() != null) {
             rows.addAll(jdbcTemplate.queryForList(
+                    "SELECT id, dept_name FROM sys_department WHERE deleted = 0 AND id = ?",
+                    user.getDepartmentId()));
+            rows.addAll(jdbcTemplate.queryForList(
                     "SELECT id, dept_name FROM sys_department WHERE deleted = 0 AND " +
                     "(dept_path LIKE CONCAT((SELECT dept_path FROM sys_department WHERE id = ?), '%') " +
                     "OR id IN (SELECT DISTINCT f.dept_id FROM dat_file f JOIN dat_file_share s ON s.file_id = f.id WHERE s.dept_id = ?))",
                     user.getDepartmentId(), user.getDepartmentId()));
         }
         List<WebDavPropFindXmlBuilder.VirtualDept> depts = new ArrayList<>();
+        Set<Long> seenDeptIds = new HashSet<>();
         for (Map<String, Object> r : rows) {
-            depts.add(new WebDavPropFindXmlBuilder.VirtualDept(
-                    ((Number) r.get("id")).longValue(), (String) r.get("dept_name")));
+            Long id = ((Number) r.get("id")).longValue();
+            if (seenDeptIds.add(id)) {
+                depts.add(new WebDavPropFindXmlBuilder.VirtualDept(id, (String) r.get("dept_name")));
+            }
         }
         return depts;
     }
@@ -401,6 +426,17 @@ public class WebDavController extends HttpServlet {
         DatFileQuery q = new DatFileQuery();
         q.setParentId(parentId);
         return q;
+    }
+
+    private List<DatFile> listUnassignedRootFiles(LoginUser user) {
+        DatFileQuery q = new DatFileQuery();
+        List<DatFile> result = new ArrayList<>();
+        for (DatFileVO vo : fileService.listFiles(q, user)) {
+            if (vo.getDeptId() == null) {
+                result.add(toEntity(vo));
+            }
+        }
+        return result;
     }
 
     /** listFiles 已在 service 层完成可见性过滤（含共享后代文件夹保留），此处仅 VO→Entity。 */

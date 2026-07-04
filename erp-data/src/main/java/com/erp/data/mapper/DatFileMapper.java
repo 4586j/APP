@@ -16,13 +16,13 @@ public interface DatFileMapper extends BaseMapper<DatFile> {
     /**
      * 查询某目录下的直接子项。
      */
-    @Select("SELECT * FROM dat_file WHERE parent_id = #{parentId} AND deleted = 0 ORDER BY is_directory DESC, name ASC")
+    @Select("SELECT * FROM dat_file WHERE parent_id = #{parentId} AND deleted = 0 ORDER BY is_directory DESC, name ASC, id DESC")
     List<DatFile> selectByParentId(Long parentId);
 
     /**
      * 查询根目录文件/文件夹（parent_id IS NULL）。
      */
-    @Select("SELECT * FROM dat_file WHERE parent_id IS NULL AND deleted = 0 ORDER BY is_directory DESC, name ASC")
+    @Select("SELECT * FROM dat_file WHERE parent_id IS NULL AND deleted = 0 ORDER BY is_directory DESC, name ASC, id DESC")
     List<DatFile> selectRootFiles();
 
     /**
@@ -34,7 +34,7 @@ public interface DatFileMapper extends BaseMapper<DatFile> {
     /**
      * 查询某部门的根目录文件/文件夹（parent_id IS NULL）。
      */
-    @Select("SELECT * FROM dat_file WHERE dept_id = #{deptId} AND parent_id IS NULL AND deleted = 0 ORDER BY is_directory DESC, name ASC")
+    @Select("SELECT * FROM dat_file WHERE dept_id = #{deptId} AND parent_id IS NULL AND deleted = 0 ORDER BY is_directory DESC, name ASC, id DESC")
     List<DatFile> selectRootFilesByDeptId(Long deptId);
 
     /**

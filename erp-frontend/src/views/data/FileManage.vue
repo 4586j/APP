@@ -224,6 +224,21 @@ const searchKeyword = ref('')
 // 目录树
 const departmentTree = ref<DepartmentNode[]>([])
 
+function resolveOperationDeptId() {
+  return currentDeptId.value || (
+    userStore.userInfo?.departmentId != null ? String(userStore.userInfo.departmentId) : undefined
+  )
+}
+
+function requireOperationDeptId() {
+  const deptId = resolveOperationDeptId()
+  if (!currentParentId.value && !deptId) {
+    ElMessage.warning('请先在左侧选择部门后再操作')
+    return undefined
+  }
+  return deptId
+}
+
 function filterNode(value: string, data: any) {
   if (!value) return true
   return data.name?.toLowerCase().includes(value.toLowerCase())
@@ -331,7 +346,9 @@ async function confirmCreateFolder() {
   }
   creatingFolder.value = true
   try {
-    await createFolder(currentParentId.value, newFolderName.value.trim())
+    const deptId = requireOperationDeptId()
+    if (!currentParentId.value && !deptId) return
+    await createFolder(currentParentId.value, newFolderName.value.trim(), deptId)
     ElMessage.success('创建成功')
     showNewFolderDialog.value = false
     await refreshList()
@@ -448,6 +465,8 @@ async function startFolderUpload() {
   const shareIds = folderShareDeptIds.value.length > 0
     ? folderShareDeptIds.value.map(String).join(',')
     : undefined
+  const deptId = requireOperationDeptId()
+  if (!currentParentId.value && !deptId) return
 
   // 解析目录结构
   const dirMap = new Map<string, string>() // relativeDirPath -> serverFolderId
@@ -477,12 +496,11 @@ async function startFolderUpload() {
       const name = parts[parts.length - 1]
       const parentRelPath = parts.slice(0, -1).join('/')
       const parentId = parentRelPath ? dirMap.get(parentRelPath) : currentParentId.value
-      try {
-        const id = await createFolder(parentId, name, shareIds)
-        dirMap.set(dirPath, id)
-      } catch (e: any) {
-        console.error(`创建目录失败: ${dirPath}`, e)
+      if (parentRelPath && !parentId) {
+        throw new Error(`父目录创建失败: ${parentRelPath}`)
       }
+      const id = await ensureFolder(parentId, name, deptId, shareIds)
+      dirMap.set(dirPath, id)
     }
 
     // 上传文件
@@ -492,16 +510,17 @@ async function startFolderUpload() {
       const parts = relPath.split('/')
       const dirPath = parts.slice(0, -1).join('/')
       const targetParentId = dirPath ? dirMap.get(dirPath) : currentParentId.value
+      if (dirPath && !targetParentId) {
+        throw new Error(`目标目录不存在: ${dirPath}`)
+      }
 
       folderUploadProgress.value = `正在上传: ${relPath}`
       folderCurrentPercent.value = 0
-      try {
-        await uploadFileToNetdisk(file, targetParentId, undefined, undefined, shareIds,
-          (p) => { folderCurrentPercent.value = p }
-        )
-      } catch (e: any) {
-        console.error(`上传失败: ${relPath}`, e)
-      }
+      await uploadFileToNetdisk(file, targetParentId, undefined, deptId, shareIds,
+        (p) => { folderCurrentPercent.value = p }
+      ).catch((e: any) => {
+        throw new Error(`上传失败: ${relPath}，${e?.message || '请检查权限或网络'}`)
+      })
       completed++
       folderUploadPercent.value = Math.round((completed / files.length) * 100)
     }
@@ -516,6 +535,25 @@ async function startFolderUpload() {
     pendingFolderFiles.value = []
     folderShareDeptIds.value = []
     if (folderInputRef.value) folderInputRef.value.value = '' // 清空 input 以便重复选择同一文件夹
+  }
+}
+
+async function ensureFolder(parentId: string | undefined, name: string, deptId: string | undefined, shareIds: string | undefined) {
+  const children = await listFiles({ parentId, deptId })
+  const existing = children.find((item) =>
+    item.isDirectory === 1 && (item.displayName || item.name) === name
+  )
+  if (existing?.id) return existing.id
+
+  try {
+    return await createFolder(parentId, name, deptId, shareIds)
+  } catch (e: any) {
+    const latestChildren = await listFiles({ parentId, deptId })
+    const latestExisting = latestChildren.find((item) =>
+      item.isDirectory === 1 && (item.displayName || item.name) === name
+    )
+    if (latestExisting?.id) return latestExisting.id
+    throw new Error(`创建目录失败: ${name}，${e?.message || '请检查权限或是否重名'}`)
   }
 }
 
@@ -539,12 +577,14 @@ async function doUploadFiles() {
   uploadPercent.value = 0
   let success = 0
   try {
+    const deptId = requireOperationDeptId()
+    if (!currentParentId.value && !deptId) return
     for (const file of uploadFiles.value) {
       const shareIds = uploadShareDeptIds.value.length > 0
         ? uploadShareDeptIds.value.map(String).join(',')
         : undefined
       await uploadFileToNetdisk(
-        file, currentParentId.value, undefined, undefined, shareIds,
+        file, currentParentId.value, undefined, deptId, shareIds,
         (p) => { uploadPercent.value = p }
       )
       success++
