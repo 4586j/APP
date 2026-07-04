@@ -209,7 +209,7 @@ public class DatFileServiceImpl implements DatFileService {
                 filtered.add(f);
             } else if (f.getIsDirectory() != null && f.getIsDirectory() == 1
                     && user.getDepartmentId() != null && f.getPath() != null
-                    && mapper.selectSharedDescendantExists(f.getPath() + "/", user.getDepartmentId())) {
+                    && mapper.selectSharedDescendantExists(f.getPath(), user.getDepartmentId())) {
                 // 文件夹本身不可见，但含被共享给本部门的后代 → 保留以便下钻
                 filtered.add(f);
             }
@@ -252,7 +252,8 @@ public class DatFileServiceImpl implements DatFileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long createFolder(Long parentId, String name, Long deptId, LoginUser user) {
+    public Long createFolder(Long parentId, String name, Long deptId, List<Long> shareDeptIds, LoginUser user) {
+        log.info("createFolder: parentId={}, name={}, deptId={}, shareDeptIds={}, userId={}", parentId, name, deptId, shareDeptIds, user.getId());
         DatFile parent = parentId == null ? null : mapper.selectById(parentId);
         if (parentId != null && parent == null) throw new BusinessException(R.CODE_NOT_FOUND, "父目录不存在");
         if (parentId != null && !canWrite(parent, user)) throw new BusinessException(R.CODE_FORBIDDEN, "无权在此目录下创建");
@@ -272,6 +273,8 @@ public class DatFileServiceImpl implements DatFileService {
         String parentPath = parent == null ? "/" : parent.getPath();
         f.setPath(parentPath + f.getId() + "/");
         mapper.updateById(f);
+        // 保存共享部门（文件夹上传时为每级目录写入，使共享部门可见整棵子树）
+        saveShareDepts(f.getId(), shareDeptIds);
         return f.getId();
     }
 
@@ -279,6 +282,7 @@ public class DatFileServiceImpl implements DatFileService {
     @Transactional(rollbackFor = Exception.class)
     public Long uploadFile(MultipartFile file, Long parentId, String fileType,
                             Long deptId, List<Long> shareDeptIds, LoginUser user) {
+        log.info("uploadFile: name={}, parentId={}, fileType={}, deptId={}, shareDeptIds={}, userId={}", file.getOriginalFilename(), parentId, fileType, deptId, shareDeptIds, user.getId());
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("请选择要上传的文件");
         }
@@ -334,6 +338,7 @@ public class DatFileServiceImpl implements DatFileService {
     }
 
     private void saveShareDepts(Long fileId, List<Long> deptIds) {
+        log.info("saveShareDepts: fileId={}, deptIds={}", fileId, deptIds);
         if (deptIds != null && !deptIds.isEmpty()) {
             for (Long sid : deptIds) {
                 if (sid == null) continue;

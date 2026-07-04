@@ -27,8 +27,10 @@ public interface DatFileService {
      * @param deptId 目标部门 id（WebDAV 在部门根下建文件夹时由 URL 解析得出，
      *               决定新文件夹归属部门）。传 null 时回退：父目录有则用父目录部门，
      *               父目录为空（部门根）则用当前用户所在部门。
+     * @param shareDeptIds 共享部门 id 列表（网盘上传文件夹时由前端传入，
+     *                     为每级目录写入共享记录，使共享部门可见整棵子树）。可为 null。
      */
-    Long createFolder(Long parentId, String name, Long deptId, LoginUser user);
+    Long createFolder(Long parentId, String name, Long deptId, List<Long> shareDeptIds, LoginUser user);
 
     /**
      * 上传文件到指定目录。

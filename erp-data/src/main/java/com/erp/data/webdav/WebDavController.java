@@ -175,7 +175,7 @@ public class WebDavController extends HttpServlet {
                 WebDavErrors.write(response, new BusinessException(R.CODE_FORBIDDEN, "无权创建文件夹"));
                 return;
             }
-            fileService.createFolder(parentFolderId(parent), lastSegment(request.getRequestURI()), parentDeptId(parent), user);
+            fileService.createFolder(parentFolderId(parent), lastSegment(request.getRequestURI()), parentDeptId(parent), null, user);
             response.setStatus(201);
         } catch (BusinessException ex) {
             int sc = WebDavErrors.statusCode(ex);

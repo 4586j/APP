@@ -157,8 +157,8 @@ export function getBreadcrumb(fileId?: string) {
   return get<DatFileVO[]>('/files/breadcrumb', { fileId })
 }
 
-export function createFolder(parentId: string | undefined, name: string) {
-  return post<string>('/files/folder', null, { params: { parentId, name } })
+export function createFolder(parentId: string | undefined, name: string, shareDeptIds?: string) {
+  return post<string>('/files/folder', null, { params: { parentId, name, shareDeptIds } })
 }
 
 export function uploadFileToNetdisk(file: File, parentId: string | undefined, fileType: string | undefined, deptId: string | undefined, shareDeptIds: string | undefined, onProgress?: (percent: number) => void) {

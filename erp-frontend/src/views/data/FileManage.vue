@@ -152,9 +152,33 @@
       </template>
     </el-dialog>
 
-    <!-- 文件夹上传进度 -->
-    <el-dialog v-model="showFolderUploadDialog" title="上传文件夹" width="480px" :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false">
-      <div style="text-align:center;padding:20px">
+    <!-- 文件夹上传 -->
+    <el-dialog v-model="showFolderUploadDialog" title="上传文件夹" width="520px" :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false">
+      <!-- 准备阶段：选择共享部门 -->
+      <div v-if="!uploadingFolder">
+        <div style="margin-bottom:12px;color:#606266">
+          已选择 <b>{{ pendingFolderFiles.length }}</b> 个文件，请选择共享部门后开始上传
+        </div>
+        <el-form label-width="90px">
+          <el-form-item label="共享给部门">
+            <el-tree-select
+              v-model="folderShareDeptIds"
+              :data="departmentTree"
+              :props="{ label: 'name', children: 'children' }"
+              node-key="id"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              filterable
+              clearable
+              placeholder="选择多个部门（可选）"
+              style="width:100%"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      <!-- 上传进度 -->
+      <div v-else style="text-align:center;padding:20px">
         <div style="margin-bottom:16px;text-align:left">
           <div style="font-size:13px;color:#909399;margin-bottom:4px">当前文件进度</div>
           <el-progress :percentage="folderCurrentPercent" :stroke-width="16" :striped="true" />
@@ -165,6 +189,10 @@
         </div>
         <p style="margin-top:10px;color:#606266;font-size:13px">{{ folderUploadProgress }}</p>
       </div>
+      <template #footer>
+        <el-button v-if="!uploadingFolder" @click="cancelFolderUpload">取消</el-button>
+        <el-button v-if="!uploadingFolder" type="primary" @click="startFolderUpload">开始上传</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -385,6 +413,8 @@ const folderUploadProgress = ref('')
 const folderUploadPercent = ref(0)
 const folderCurrentPercent = ref(0)
 const showFolderUploadDialog = ref(false)
+const pendingFolderFiles = ref<File[]>([])
+const folderShareDeptIds = ref<Id[]>([])
 
 function triggerFolderUpload() {
   folderInputRef.value?.click()
@@ -393,15 +423,34 @@ function triggerFolderUpload() {
 async function onFolderSelected(event: Event) {
   const input = event.target as HTMLInputElement
   if (!input.files || !input.files.length) return
+  pendingFolderFiles.value = Array.from(input.files)
+  folderShareDeptIds.value = []
+  folderUploadPercent.value = 0
+  folderCurrentPercent.value = 0
+  folderUploadProgress.value = ''
+  uploadingFolder.value = false
+  showFolderUploadDialog.value = true
+}
 
-  const files = Array.from(input.files)
-  const shareIds = uploadShareDeptIds.value.length > 0
-    ? uploadShareDeptIds.value.map(String).join(',')
+function cancelFolderUpload() {
+  showFolderUploadDialog.value = false
+  pendingFolderFiles.value = []
+  folderShareDeptIds.value = []
+  if (folderInputRef.value) folderInputRef.value.value = ''
+}
+
+async function startFolderUpload() {
+  const files = pendingFolderFiles.value
+  if (!files.length) {
+    ElMessage.warning('未选择文件')
+    return
+  }
+  const shareIds = folderShareDeptIds.value.length > 0
+    ? folderShareDeptIds.value.map(String).join(',')
     : undefined
 
   // 解析目录结构
   const dirMap = new Map<string, string>() // relativeDirPath -> serverFolderId
-  showFolderUploadDialog.value = true
   uploadingFolder.value = true
   folderUploadPercent.value = 0
   folderCurrentPercent.value = 0
@@ -429,7 +478,7 @@ async function onFolderSelected(event: Event) {
       const parentRelPath = parts.slice(0, -1).join('/')
       const parentId = parentRelPath ? dirMap.get(parentRelPath) : currentParentId.value
       try {
-        const id = await createFolder(parentId, name)
+        const id = await createFolder(parentId, name, shareIds)
         dirMap.set(dirPath, id)
       } catch (e: any) {
         console.error(`创建目录失败: ${dirPath}`, e)
@@ -464,7 +513,9 @@ async function onFolderSelected(event: Event) {
     ElMessage.error(e?.message || '文件夹上传失败')
   } finally {
     uploadingFolder.value = false
-    input.value = '' // 清空 input 以便重复选择同一文件夹
+    pendingFolderFiles.value = []
+    folderShareDeptIds.value = []
+    if (folderInputRef.value) folderInputRef.value.value = '' // 清空 input 以便重复选择同一文件夹
   }
 }
 
