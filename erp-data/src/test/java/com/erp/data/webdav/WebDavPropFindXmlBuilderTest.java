@@ -35,6 +35,14 @@ class WebDavPropFindXmlBuilderTest {
     }
 
     @Test
+    void buildFile_returnsFileItselfWithoutAppendingNameAgain() {
+        String xml = builder.buildFile("/webdav/data/tree/c45.py", file(1L, "c45.py", false, 100));
+        assertTrue(xml.contains("<D:href>/webdav/data/tree/c45.py</D:href>"));
+        assertFalse(xml.contains("/webdav/data/tree/c45.py/c45.py"));
+        assertTrue(xml.contains("<D:iscollection>0</D:iscollection>"));
+    }
+
+    @Test
     void build_directoryIsCollection1() {
         String xml = builder.build("/webdav/sales/", List.of(file(2L, "sub", true, 0)), List.of());
         assertTrue(xml.contains("/webdav/sales/sub/</D:href>"));

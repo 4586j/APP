@@ -103,7 +103,13 @@ public class WebDavController extends HttpServlet {
                     children = depthZero ? List.of()
                             : filterVisible(fileService.listFiles(folderQuery(rp.getDatFile().getId()), user));
                 }
-                case FILE -> { children = List.of(rp.getDatFile()); }
+                case FILE -> {
+                    response.setStatus(207);
+                    response.setContentType("application/xml; charset=utf-8");
+                    response.getWriter().write(xmlBuilder.buildFile(
+                            encodedResourcePath(request.getRequestURI()), rp.getDatFile()));
+                    return;
+                }
                 case NOT_FOUND -> { response.setStatus(404); return; }
             }
             String basePath = encodedBasePath(request.getRequestURI());
@@ -327,6 +333,18 @@ public class WebDavController extends HttpServlet {
                             .replace("+", "%20"));
         }
         sb.append("/");
+        return sb.length() == 0 ? "/webdav/" : sb.toString();
+    }
+
+    private String encodedResourcePath(String uri) {
+        String after = uri.indexOf("/webdav") >= 0 ? uri.substring(uri.indexOf("/webdav")) : uri;
+        StringBuilder sb = new StringBuilder();
+        for (String seg : after.split("/")) {
+            if (seg.isEmpty()) continue;
+            sb.append("/")
+                    .append(URLEncoder.encode(URLDecoder.decode(seg, StandardCharsets.UTF_8), StandardCharsets.UTF_8)
+                            .replace("+", "%20"));
+        }
         return sb.length() == 0 ? "/webdav/" : sb.toString();
     }
 

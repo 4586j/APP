@@ -31,6 +31,16 @@ public class WebDavPropFindXmlBuilder {
         return sb.toString();
     }
 
+    public String buildFile(String href, DatFile file) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
+        sb.append("<D:multistatus xmlns:D=\"DAV:\">");
+        String name = file.getDisplayName() != null ? file.getDisplayName() : file.getName();
+        appendResponse(sb, href, name, file.getFileSize() == null ? 0 : file.getFileSize(), false);
+        sb.append("</D:multistatus>");
+        return sb.toString();
+    }
+
     private void appendResponse(StringBuilder sb, String href, String displayName, long size, boolean isCollection) {
         sb.append("<D:response>");
         sb.append("<D:href>").append(escapeXml(href)).append("</D:href>");

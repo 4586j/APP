@@ -1,6 +1,7 @@
 package com.erp.web.webdav;
 
 import com.erp.data.service.DatFileService;
+import com.erp.data.entity.DatFile;
 import com.erp.data.webdav.ResolvedPath;
 import com.erp.data.webdav.WebDavController;
 import com.erp.data.webdav.WebDavLockStore;
@@ -97,6 +98,25 @@ class WebDavControllerTest {
         when(resolver.resolve(any(), any())).thenReturn(ResolvedPath.notFound("/webdav/x/"));
         MockHttpServletResponse resp = handle("PROPFIND", "/webdav/x/");
         assertEquals(404, resp.getStatus());
+    }
+
+    @Test
+    void propfind_file_returnsFileHrefWithoutDuplicatingName() throws Exception {
+        loginAs(admin());
+        DatFile file = new DatFile();
+        file.setId(1L);
+        file.setName("c45.py");
+        file.setDisplayName("c45.py");
+        file.setIsDirectory(0);
+        file.setFileSize(100L);
+        when(resolver.resolve(any(), any())).thenReturn(ResolvedPath.of(file, "/webdav/data/tree/c45.py"));
+
+        MockHttpServletResponse resp = handle("PROPFIND", "/webdav/data/tree/c45.py");
+
+        String xml = resp.getContentAsString();
+        assertEquals(207, resp.getStatus());
+        assertTrue(xml.contains("<D:href>/webdav/data/tree/c45.py</D:href>"));
+        assertFalse(xml.contains("/webdav/data/tree/c45.py/c45.py"));
     }
 
     @Test

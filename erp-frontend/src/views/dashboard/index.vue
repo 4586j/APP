@@ -23,7 +23,7 @@
     </div>
 
     <!-- 快捷入口 + 待办 -->
-    <el-row :gutter="16" class="section-row">
+    <el-row :gutter="16" class="section-row equal-row">
       <el-col :xs="24" :sm="24" :md="16" :lg="17">
         <div class="panel-card">
           <div class="panel-header">
@@ -217,7 +217,7 @@
       <div class="panel-header">
         <span class="panel-title">本月工作统计</span>
       </div>
-      <div class="my-kpi-grid">
+      <div class="my-kpi-grid my-kpi-grid--3">
         <div class="my-kpi-item">
           <div class="my-kpi-value" style="color:#2563eb">{{ reportStats.planCount }}</div>
           <div class="my-kpi-label">已提交计划</div>
@@ -671,6 +671,27 @@ onUnmounted(() => {
   }
 }
 
+/* 快捷入口 + 待办：两卡片等高，内部内容垂直居中分布，保持对称 */
+.equal-row {
+  align-items: stretch;
+  .el-col {
+    display: flex;
+  }
+  .panel-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .shortcut-grid {
+    flex: 1;
+    align-content: center;
+  }
+  .todo-list {
+    flex: 1;
+    justify-content: space-between;
+  }
+}
+
 /* 快捷入口 */
 .shortcut-grid {
   display: grid;
@@ -926,6 +947,9 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+}
+.my-kpi-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
 }
 @media (max-width: 768px) {
   .my-kpi-grid { grid-template-columns: repeat(2, 1fr); }
