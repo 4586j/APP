@@ -163,7 +163,11 @@ export function createFolder(parentId: string | undefined, name: string, deptId?
 
 export function uploadFileToNetdisk(file: File, parentId: string | undefined, fileType: string | undefined, deptId: string | undefined, shareDeptIds: string | undefined, onProgress?: (percent: number) => void) {
   const formData = new FormData()
-  formData.append('file', file)
+  // 第三参数显式指定纯文件名：webkitdirectory 选出的 File，浏览器默认会用
+  // webkitRelativePath（如 "决策树/c45.py"）作为 multipart filename，导致后端
+  // display_name 含斜杠，WebDAV PROPFIND 拼 href 时 / 被编码成 %2F 而无法显示。
+  // 强制用 file.name（纯名）从源头消除 display_name 污染。
+  formData.append('file', file, file.name)
   if (parentId) formData.append('parentId', parentId)
   if (fileType) formData.append('fileType', fileType)
   if (deptId) formData.append('deptId', deptId)
