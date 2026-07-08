@@ -3,6 +3,7 @@ package com.erp.data.service.impl;
 import com.erp.data.entity.DatFile;
 import com.erp.data.mapper.DatFileMapper;
 import com.erp.data.mapper.DatFileShareMapper;
+import com.erp.data.storage.LocalStorageBackend;
 import com.erp.security.user.LoginUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,8 +30,8 @@ class DatFilePermissionTest {
 
     @BeforeEach
     void setUp() {
-        // 手动构造，绕过 @Value 注入
-        service = new DatFileServiceImpl("./uploads/data", mapper, shareMapper, jdbcTemplate);
+        // 手动构造，绕过 @Value 注入；注入 LocalStorageBackend
+        service = new DatFileServiceImpl(new LocalStorageBackend("./uploads/data"), mapper, shareMapper, jdbcTemplate);
     }
 
     private LoginUser user(Long id, Long deptId, boolean admin) {

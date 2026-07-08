@@ -13,20 +13,18 @@ import com.erp.data.service.DatFileService;
 import com.erp.security.user.LoginUser;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.erp.data.storage.StorageBackend;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,16 +32,16 @@ import java.util.stream.Collectors;
 @Service
 public class DatFileServiceImpl implements DatFileService {
 
-    private final Path uploadRoot;
+    private final StorageBackend storage;
     private final DatFileMapper mapper;
     private final DatFileShareMapper shareMapper;
     private final JdbcTemplate jdbcTemplate;
 
-    public DatFileServiceImpl(@Value("${app.upload.data-root:./uploads/data}") String dataRoot,
+    public DatFileServiceImpl(StorageBackend storage,
                               DatFileMapper mapper,
                               DatFileShareMapper shareMapper,
                               JdbcTemplate jdbcTemplate) {
-        this.uploadRoot = Path.of(dataRoot).toAbsolutePath().normalize();
+        this.storage = storage;
         this.mapper = mapper;
         this.shareMapper = shareMapper;
         this.jdbcTemplate = jdbcTemplate;
@@ -333,15 +331,10 @@ public class DatFileServiceImpl implements DatFileService {
             throw new BusinessException(R.CODE_FORBIDDEN, "无权在此部门下上传");
         }
 
-        // 物理存储：按部门/日期分片
-        Path deptDir = effectiveDeptId != null ? uploadRoot.resolve(String.valueOf(effectiveDeptId)) : uploadRoot.resolve("_common");
-        Path dayDir = deptDir.resolve(LocalDate.now().toString().replace("-", ""));
-        String storedName = UUID.randomUUID() + suffix;
-        Path target = dayDir.resolve(storedName).normalize();
-
-        try {
-            Files.createDirectories(dayDir);
-            file.transferTo(target);
+        // 物理存储：委托 StorageBackend，返回相对 key
+        String storageKey;
+        try (InputStream in = file.getInputStream()) {
+            storageKey = storage.store(in, file.getSize(), safeName, effectiveDeptId);
         } catch (IOException ex) {
             throw new IllegalStateException("文件保存失败", ex);
         }
@@ -354,7 +347,7 @@ public class DatFileServiceImpl implements DatFileService {
         f.setExtension(suffix.isEmpty() ? null : suffix);
         f.setMimeType(file.getContentType());
         f.setFileSize(file.getSize());
-        f.setStoragePath(target.toString());
+        f.setStoragePath(storageKey);
         f.setFileType(fileType);
         f.setDeptId(effectiveDeptId);
         f.setCreatedBy(user.getId());
@@ -460,8 +453,7 @@ public class DatFileServiceImpl implements DatFileService {
         if (f.getStoragePath() == null || f.getStoragePath().isEmpty()) {
             throw new BusinessException(R.CODE_PARAM_INVALID, "file path not set");
         }
-        Path file = Path.of(f.getStoragePath());
-        if (!Files.exists(file)) {
+        if (!storage.exists(f.getStoragePath())) {
             throw new BusinessException(R.CODE_NOT_FOUND, "file not found on disk");
         }
         try {
@@ -469,10 +461,8 @@ public class DatFileServiceImpl implements DatFileService {
                 StandardCharsets.UTF_8).replaceAll("\\+", "%20");
             response.setContentType("application/octet-stream");
             response.setHeader("Content-Disposition", "attachment; filename*=utf-8''" + encodedName);
-            response.setContentLengthLong(Files.size(file));
-            try (InputStream in = Files.newInputStream(file)) {
-                in.transferTo(response.getOutputStream());
-            }
+            response.setContentLengthLong(f.getFileSize() != null ? f.getFileSize() : -1);
+            storage.writeTo(f.getStoragePath(), response.getOutputStream());
             response.flushBuffer();
         } catch (IOException ex) {
             throw new IllegalStateException("file download failed", ex);
@@ -494,18 +484,12 @@ public class DatFileServiceImpl implements DatFileService {
         if (!canWrite(f, user)) {
             throw new BusinessException(R.CODE_FORBIDDEN, "无权修改该文件");
         }
-        java.nio.file.Path target = java.nio.file.Path.of(f.getStoragePath());
         try {
-            java.nio.file.Files.createDirectories(target.getParent());
-            long size;
-            try (java.io.OutputStream out = java.nio.file.Files.newOutputStream(target,
-                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)) {
-                size = in.transferTo(out);
-            }
+            long size = storage.overwrite(f.getStoragePath(), in, -1);
             f.setFileSize(size);
             f.setUpdatedBy(user.getId());
             mapper.updateById(f);
-        } catch (java.io.IOException ex) {
+        } catch (IOException ex) {
             throw new IllegalStateException("文件保存失败", ex);
         }
     }
